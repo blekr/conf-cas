@@ -12,3 +12,4 @@ docker-compose.override.yml
 !.vscode/snippets
 !.vscode/launch.json
 !.vscode/settings.json
+.idea/
