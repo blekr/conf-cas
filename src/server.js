@@ -12,9 +12,12 @@ import app from './app';
 import db from './db';
 import redis from './redis';
 import errors from './errors';
+import { connectMongoDB } from './entity';
 
 const port = process.env.PORT || 8080;
 const host = process.env.HOSTNAME || '0.0.0.0';
+
+connectMongoDB();
 
 // Launch Node.js server
 const server = app.listen(port, host, () => {

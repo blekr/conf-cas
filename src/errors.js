@@ -45,4 +45,12 @@ export class ForbiddenError extends Error {
   message = this.message || 'Access is denied.';
 }
 
+export class ServerError extends Error {}
+export class ClientError extends Error {
+  constructor(errorCode, message = '') {
+    super(message);
+    this.errorCode = errorCode;
+  }
+}
+
 export default { report };

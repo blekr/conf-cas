@@ -25,6 +25,8 @@
     "jest": "^22.0.0",
     "juice": "^4.2.2",
     "knex": "^0.14.2",
+    "lodash": "^4.17.10",
+    "mongoose": "^5.2.4",
     "node-fetch": "^1.7.3",
     "nodemailer": "^4.4.1",
     "passport": "^0.4.0",
@@ -35,7 +37,8 @@
     "pretty-error": "^2.1.1",
     "redis": "^2.8.0",
     "source-map-support": "^0.5.0",
-    "validator": "^9.2.0"
+    "validator": "^9.2.0",
+    "winston": "^3.0.0"
   },
   "devDependencies": {
     "babel-cli": "^6.26.0",
