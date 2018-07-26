@@ -45,7 +45,9 @@ export function updateConferenceAttr({ bridgeId, confId, type, attr }) {
     },
     {
       $set: {
-        [type]: attr,
+        attr: {
+          [type]: attr,
+        },
       },
     },
   ).exec();
