@@ -36,3 +36,17 @@ export function removeConference({ bridgeID, confId }) {
     { $set: { deleted: true } },
   ).exec();
 }
+
+export function updateConferenceAttr({ bridgeId, confId, type, attr }) {
+  return Conference.updateOne(
+    {
+      bridgeId,
+      confId,
+    },
+    {
+      $set: {
+        [type]: attr,
+      },
+    },
+  ).exec();
+}
