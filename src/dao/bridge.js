@@ -10,7 +10,10 @@ export function upsertBridge(bridgeId) {
 }
 
 export async function removeObsBridge(date) {
-  return Bridge.deleteMany({ updatedAt: { $lt: date } }).exec();
+  return Bridge.updateMany(
+    { updatedAt: { $lt: date } },
+    { $set: { deleted: true } },
+  ).exec();
 }
 
 export function removeBridgeById(bridgeId) {

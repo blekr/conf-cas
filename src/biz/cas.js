@@ -18,6 +18,13 @@ import {
   updateConferenceAttr,
   upsertConference,
 } from '../dao/conference';
+import {
+  removeParticipant,
+  updateParticipantAttr,
+  upsertParticipant,
+} from '../dao/participant';
+import { DTMF } from '../entity/DTMF';
+import { Vetting } from '../entity/Vetting';
 
 let client;
 let upsertServiceListTime;
@@ -297,6 +304,108 @@ async function updateConferenceAttributes({ sessionId, params }) {
   }
 }
 
+async function refreshParticipantList({ sessionId, params }) {
+  const bridgeId = sessions[sessionId].bridgeId;
+  const confId = sessions[sessionId].confId;
+  // const m = params[0];
+  // const n = params[1];
+  const count = parseInt(params[2], 10);
+  let index = 3;
+  for (let i = 0; i < count; i += 1) {
+    await upsertParticipant({
+      bridgeId,
+      confId,
+      partyId: params[index++],
+      partyName: params[index++],
+    });
+  }
+}
+
+async function updateParticipantAttributes({ sessionId, params }) {
+  const bridgeId = sessions[sessionId].bridgeId;
+  const confId = sessions[sessionId].confId;
+
+  const partyId = params[0];
+  const type = params[1];
+  let index = 2;
+  switch (type) {
+    case '1':
+      await updateParticipantAttr({
+        bridgeId,
+        confId,
+        partyId,
+        type,
+        attr: {
+          initialized: params[index++],
+          partyName: params[index++],
+          phone: params[index++],
+          operatorID: params[index++],
+          userDefined: params[index++],
+          pIN: params[index++],
+          dNIS: params[index++],
+          aNI: params[index++],
+          billingField: params[index++],
+          billingType: params[index++],
+          isModerator: params[index++],
+          hostCtrlLevel: params[index++],
+          multipleDialoutOrder: params[index++],
+        },
+      });
+      break;
+    case '2':
+      await updateParticipantAttr({
+        bridgeId,
+        confId,
+        partyId,
+        type,
+        attr: {
+          location: params[index++],
+          connectState: params[index++],
+          disconnectReason: params[index++],
+          operHelpReq: params[index++],
+          userDefined2: params[index++],
+          userDefined3: params[index++],
+          userDefined4: params[index++],
+          beingVetted: params[index++],
+          bridgeTime: params[index++],
+          operatorTime: params[index++],
+          conferenceTime: params[index++],
+          aGC: params[index++],
+          dataConfID: params[index++],
+          operatorConfID: params[index++],
+          rosterReconciliationID: params[index++],
+          dialedIn: params[index++],
+          reasonForMute: params[index++],
+          inputGain: params[index++],
+          outputGain: params[index++],
+          isAudioClientParty: params[index++],
+          networkHold: params[index++],
+          userDefined5: params[index++],
+          userDefined6: params[index++],
+          userDefined7: params[index++],
+          userDefined8: params[index++],
+          userDefined9: params[index++],
+          userDefined10: params[index++],
+        },
+      });
+      break;
+    case '3':
+      await updateParticipantAttr({
+        bridgeId,
+        confId,
+        partyId,
+        type,
+        attr: {
+          iSDNCauseCode: params[index++],
+        },
+      });
+      break;
+    default:
+      logger.error(`unknown type of participant attributes type: ${type}`);
+      break;
+  }
+}
+
 async function onMessage(message) {
   logger.info('got message: ', message);
   if (message.nak) {
@@ -362,15 +471,65 @@ async function onMessage(message) {
       break;
     }
 
-    // Reports the conference’s attributes
+    // Active Conference: conference’s attributes
     case 'ACV.A': {
       await updateConferenceAttributes(message);
       break;
     }
 
-    // Reports the list of participants of the conference
+    // Active Conference: participants
     case 'ACV.PL':
+      await refreshParticipantList(message);
       break;
+    case 'ACV.P.ADD': {
+      const bridgeId = sessions[message.sessionId].bridgeId;
+      const confId = sessions[message.sessionId].confId;
+      const partyId = message.params[0];
+      const partyName = message.params[1];
+      await upsertParticipant({ bridgeId, confId, partyId, partyName });
+      break;
+    }
+    case 'ACV.P.DEL': {
+      const bridgeId = sessions[message.sessionId].bridgeId;
+      const confId = sessions[message.sessionId].confId;
+      const partyId = message.params[0];
+      await removeParticipant({ bridgeId, confId, partyId });
+      break;
+    }
+    case 'ACV.P.A':
+      await updateParticipantAttributes(message);
+      break;
+    case 'ACV.P.DTMF': {
+      const { sessionId, params } = message;
+      const bridgeId = sessions[sessionId].bridgeId;
+      const confId = sessions[sessionId].confId;
+      let index = 0;
+      await new DTMF({
+        bridgeId,
+        confId,
+        partyId: params[index++],
+        DTMF: params[index++],
+        summitPortID: params[index++],
+        partyName: params[index++],
+        partyPhone: params[index++],
+        partyPcode: params[index++],
+        confHostPcode: params[index++],
+        confGuestPcode: params[index++],
+        confBillCode: params[index++],
+      }).save();
+      break;
+    }
+    case 'ACV.P.VET.ALERT': {
+      const { sessionId, params } = message;
+      const bridgeId = sessions[sessionId].bridgeId;
+      const confId = sessions[sessionId].confId;
+      await new Vetting({
+        bridgeId,
+        confId,
+        partyId: params[0],
+      }).save();
+      break;
+    }
     default:
       logger.error('unrecognized message: ', message);
       break;

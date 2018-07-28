@@ -27,7 +27,10 @@ export function upsertConference({
 }
 
 export async function removeObsConference(date) {
-  return Conference.deleteMany({ updatedAt: { $lt: date } }).exec();
+  return Conference.updateMany(
+    { updatedAt: { $lt: date } },
+    { $set: { deleted: true } },
+  ).exec();
 }
 
 export function removeConference({ bridgeID, confId }) {

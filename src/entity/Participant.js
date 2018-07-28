@@ -72,6 +72,10 @@ const schema = new Schema(
         iSDNCauseCode: Number,
       },
     },
+    deleted: {
+      type: Boolean,
+      index: true,
+    },
   },
   {
     timestamps: true,
