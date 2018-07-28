@@ -19,18 +19,43 @@ import {
   upsertConference,
 } from '../dao/conference';
 import {
+  removeObsParticipant,
   removeParticipant,
   updateParticipantAttr,
   upsertParticipant,
 } from '../dao/participant';
 import { DTMF } from '../entity/DTMF';
 import { Vetting } from '../entity/Vetting';
+import { removeObsQAModerator, upsertQAModerator } from '../dao/QAModerator';
+import { upsertQAFloorParty } from '../dao/QAFloorParty';
+import { removeObsQAQueue, upsertQAQueue } from '../dao/QAQueue';
+import { upsertQAPartyState } from '../dao/QAPartyState';
 
 let client;
 let upsertServiceListTime;
 let refreshBridgeListTime;
 const refreshConferenceListTime = {};
-const sessions = {}; // {sessionId: {type: ['BV', 'ACV'], seq: number, bridgeId: string, confId: string}}
+const sessions = {};
+
+/*
+ * <pre>
+ * {
+ *   sessionId: {
+ *     type: ['BV', 'ACV'],
+ *     seq: number,
+ *     bridgeId: string,
+ *     confId: string,
+ *     time: {
+ *       participant: Date,
+ *       QA: {
+ *         moderator: Date,
+ *         queue: Date,
+ *       }
+ *     }
+ *  }
+ * }
+ * </pre>
+*/
 
 async function upsertServiceList(message) {
   if (!upsertServiceListTime) {
@@ -305,10 +330,15 @@ async function updateConferenceAttributes({ sessionId, params }) {
 }
 
 async function refreshParticipantList({ sessionId, params }) {
-  const bridgeId = sessions[sessionId].bridgeId;
-  const confId = sessions[sessionId].confId;
-  // const m = params[0];
-  // const n = params[1];
+  const { bridgeId, confId, time } = sessions[sessionId];
+
+  if (!time.participant) {
+    time.participant = new Date();
+  }
+
+  const m = params[0];
+  const n = params[1];
+
   const count = parseInt(params[2], 10);
   let index = 3;
   for (let i = 0; i < count; i += 1) {
@@ -318,6 +348,11 @@ async function refreshParticipantList({ sessionId, params }) {
       partyId: params[index++],
       partyName: params[index++],
     });
+  }
+
+  if (m === n) {
+    await removeObsParticipant(time.participant);
+    time.participant = null;
   }
 }
 
@@ -402,6 +437,63 @@ async function updateParticipantAttributes({ sessionId, params }) {
       break;
     default:
       logger.error(`unknown type of participant attributes type: ${type}`);
+      break;
+  }
+}
+
+async function refreshQA({ sessionId, params }) {
+  const { bridgeId, confId, time } = sessions[sessionId];
+  const type = params[0];
+  switch (type) {
+    case '1': {
+      const m = params[1];
+      const n = params[2];
+      const count = parseInt(params[3], 10);
+
+      if (!time.QA.moderator) {
+        time.QA.moderator = new Date();
+      }
+      let index = 4;
+      for (let i = 0; i < count; i += 1) {
+        await upsertQAModerator({ bridgeId, confId, partyId: params[index++] });
+      }
+      if (m === n) {
+        await removeObsQAModerator(time.QA.moderator);
+        time.QA.moderator = null;
+      }
+      break;
+    }
+    case '2': {
+      const m = params[1];
+      const n = params[2];
+      const floorPartyID = params[3];
+      const count = parseInt(params[4], 10);
+
+      await upsertQAFloorParty({ bridgeId, confId, partyId: floorPartyID });
+
+      if (!time.QA.queue) {
+        time.QA.queue = new Date();
+      }
+      let index = 4;
+      for (let i = 0; i < count; i += 1) {
+        await upsertQAQueue({ bridgeId, confId, partyId: params[index++] });
+      }
+
+      if (m === n) {
+        await removeObsQAQueue(time.QA.queue);
+        time.QA.queue = null;
+      }
+      break;
+    }
+    case '3': {
+      const partyId = params[1];
+      const state = params[2];
+      const position = params[3];
+      await upsertQAPartyState({ bridgeId, confId, partyId, state, position });
+      break;
+    }
+    default:
+      logger.error(`unknown subtype for ACV.Q.A: ${type}`);
       break;
   }
 }
@@ -530,6 +622,9 @@ async function onMessage(message) {
       }).save();
       break;
     }
+    case 'ACV.Q.A':
+      await refreshQA(message);
+      break;
     default:
       logger.error('unrecognized message: ', message);
       break;

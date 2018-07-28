@@ -21,6 +21,13 @@ export function removeParticipant({ bridgeId, confId, partyId }) {
   ).exec();
 }
 
+export async function removeObsParticipant(date) {
+  return Participant.updateMany(
+    { updatedAt: { $lt: date } },
+    { $set: { deleted: true } },
+  ).exec();
+}
+
 export function updateParticipantAttr({
   bridgeId,
   confId,
