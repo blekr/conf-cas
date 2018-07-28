@@ -30,6 +30,7 @@ import { removeObsQAModerator, upsertQAModerator } from '../dao/QAModerator';
 import { upsertQAFloorParty } from '../dao/QAFloorParty';
 import { removeObsQAQueue, upsertQAQueue } from '../dao/QAQueue';
 import { upsertQAPartyState } from '../dao/QAPartyState';
+import { updateVoteTally, upsertVoteQuestion } from '../dao/vote';
 
 let client;
 let upsertServiceListTime;
@@ -498,6 +499,54 @@ async function refreshQA({ sessionId, params }) {
   }
 }
 
+async function upsertVote({ sessionId, params }) {
+  const { bridgeId, confId } = sessions[sessionId];
+  const type = params[0];
+  let index = 1;
+  switch (type) {
+    case '1':
+      await upsertVoteQuestion({
+        bridgeId,
+        confId,
+        question: params[index++],
+        choices: [
+          params[index++],
+          params[index++],
+          params[index++],
+          params[index++],
+          params[index++],
+          params[index++],
+          params[index++],
+          params[index++],
+          params[index++],
+        ],
+      });
+      break;
+    case '2':
+      await updateVoteTally({
+        bridgeId,
+        confId,
+        tallyCompleted: params[index++],
+        ooVotes: params[index++],
+        votes: [
+          params[index++],
+          params[index++],
+          params[index++],
+          params[index++],
+          params[index++],
+          params[index++],
+          params[index++],
+          params[index++],
+          params[index++],
+        ],
+      });
+      break;
+    default:
+      logger.error(`unknown subtype of ACV.V.A: ${type}`);
+      break;
+  }
+}
+
 async function onMessage(message) {
   logger.info('got message: ', message);
   if (message.nak) {
@@ -624,6 +673,9 @@ async function onMessage(message) {
     }
     case 'ACV.Q.A':
       await refreshQA(message);
+      break;
+    case 'ACV.V.A':
+      await upsertVote(sessions);
       break;
     default:
       logger.error('unrecognized message: ', message);
