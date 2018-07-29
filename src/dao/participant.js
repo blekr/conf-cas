@@ -50,3 +50,17 @@ export function updateParticipantAttr({
     },
   ).exec();
 }
+
+export function updatePartitipantTalking({
+  bridgeId,
+  confId,
+  partyId,
+  talking,
+}) {
+  return Participant.updateOne({
+    bridgeId,
+    confId,
+    partyId,
+    talking,
+  }).exec();
+}

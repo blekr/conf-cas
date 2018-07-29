@@ -22,6 +22,7 @@ import {
   removeObsParticipant,
   removeParticipant,
   updateParticipantAttr,
+  updatePartitipantTalking,
   upsertParticipant,
 } from '../dao/participant';
 import { DTMF } from '../entity/DTMF';
@@ -677,6 +678,14 @@ async function onMessage(message) {
     case 'ACV.V.A':
       await upsertVote(sessions);
       break;
+    case 'ACV.P.TALKER': {
+      const { sessionId, params } = message;
+      const { bridgeId, confId } = sessions[sessionId];
+      const partyId = params[0];
+      const talking = params[1];
+      await updatePartitipantTalking({ bridgeId, confId, partyId, talking });
+      break;
+    }
     default:
       logger.error('unrecognized message: ', message);
       break;

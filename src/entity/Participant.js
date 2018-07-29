@@ -23,6 +23,9 @@ const schema = new Schema(
     partyName: {
       type: String,
     },
+    talking: {
+      type: Boolean,
+    },
     attr: {
       1: {
         initialized: Number,
