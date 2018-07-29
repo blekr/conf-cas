@@ -21,6 +21,9 @@ const schema = new Schema(
     guestCode: {
       type: String,
     },
+    billingCode: {
+      type: String,
+    },
     accountNumber: {
       type: String,
     },

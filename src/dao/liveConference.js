@@ -7,6 +7,7 @@ export function upsertLiveConference({
   confId,
   hostCode,
   guestCode,
+  billingCode,
   accountNumber,
   confActivationTime,
   partition,
@@ -17,6 +18,7 @@ export function upsertLiveConference({
       $set: {
         hostCode,
         guestCode,
+        billingCode,
         accountNumber,
         confActivationTime,
         partition,
@@ -34,9 +36,9 @@ export async function removeObsLiveConference({ bridgeId, date }) {
   ).exec();
 }
 
-export function removeLiveConference({ bridgeID, confId }) {
+export function removeLiveConference({ bridgeId, confId }) {
   return LiveConference.updateOne(
-    { bridgeID, confId },
+    { bridgeId, confId },
     { $set: { deleted: true } },
   ).exec();
 }

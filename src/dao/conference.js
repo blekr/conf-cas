@@ -33,9 +33,9 @@ export async function removeObsConference({ bridgeId, date }) {
   ).exec();
 }
 
-export function removeConference({ bridgeID, confId }) {
+export function removeConference({ bridgeId, confId }) {
   return Conference.updateOne(
-    { bridgeID, confId },
+    { bridgeId, confId },
     { $set: { deleted: true } },
   ).exec();
 }

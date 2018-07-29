@@ -36,6 +36,7 @@ import { updateVoteTally, upsertVoteQuestion } from '../dao/vote';
 import { upsertFailParticipant } from '../dao/failedParticipant';
 import { upsertCustomMessage } from '../dao/customMessage';
 import {
+  removeLiveConference,
   removeObsLiveConference,
   upsertLiveConference,
 } from '../dao/liveConference';
@@ -209,6 +210,7 @@ async function refreshLiveConferenceList({ sessionId, params }) {
       confId: params[index++],
       hostCode: params[index++],
       guestCode: params[index++],
+      billingCode: params[index++],
       accountNumber: params[index++],
       confActivationTime: params[index++],
       partition: params[index++],
@@ -674,7 +676,7 @@ async function onMessage(message) {
     case 'BV.B.AC.DEL': {
       const { params } = message;
       await removeConference({
-        bridgeID: params[0],
+        bridgeId: params[0],
         confId: params[1],
       });
       break;
@@ -682,6 +684,28 @@ async function onMessage(message) {
     case 'BV .B.LCL':
       await refreshLiveConferenceList(message);
       break;
+    case 'BV.B.LC.ADD': {
+      const { params } = message;
+      await upsertLiveConference({
+        bridgeId: params[0],
+        confId: params[1],
+        hostCode: params[2],
+        guestCode: params[3],
+        billingCode: params[4],
+        accountNumber: params[5],
+        confActivationTime: params[6],
+        partition: params[7],
+      });
+      break;
+    }
+    case 'BV.B.LC.DEL': {
+      const { params } = message;
+      await removeLiveConference({
+        bridgeId: params[0],
+        confId: params[1],
+      });
+      break;
+    }
 
     // Active Conference: conference’s attributes
     case 'ACV.A': {
