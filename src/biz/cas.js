@@ -32,6 +32,8 @@ import { upsertQAFloorParty } from '../dao/QAFloorParty';
 import { removeObsQAQueue, upsertQAQueue } from '../dao/QAQueue';
 import { upsertQAPartyState } from '../dao/QAPartyState';
 import { updateVoteTally, upsertVoteQuestion } from '../dao/vote';
+import { upsertFailParticipant } from '../dao/failedParticipant';
+import { upsertCustomMessage } from '../dao/customMessage';
 
 let client;
 let upsertServiceListTime;
@@ -684,6 +686,32 @@ async function onMessage(message) {
       const partyId = params[0];
       const talking = params[1];
       await updatePartitipantTalking({ bridgeId, confId, partyId, talking });
+      break;
+    }
+    case 'ACV.BLAST.BLACKLIST': {
+      const { sessionId, params } = message;
+      const { bridgeId, confId } = sessions[sessionId];
+      const count = parseInt(params[0], 10);
+      let index = 1;
+      for (let i = 0; i < count; i += 1) {
+        await upsertFailParticipant({
+          bridgeId,
+          confId,
+          partyId: params[index++],
+          blackListedNumber: params[index++],
+        });
+      }
+      break;
+    }
+    case 'ACV.M': {
+      const { sessionId, params } = message;
+      const { bridgeId, confId } = sessions[sessionId];
+      await upsertCustomMessage({
+        bridgeId,
+        confId,
+        customMessageNumber: params[0],
+        status: params[1],
+      });
       break;
     }
     default:
