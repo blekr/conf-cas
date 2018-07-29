@@ -11,7 +11,7 @@ export class Message {
     const replaced = mId.replace('-', '');
     return new Message()
       .sId(sId)
-      .seq(seq)
+      .seq(parseInt(seq, 10))
       .mId(replaced)
       .naked(nak)
       .appendMulti(rest);

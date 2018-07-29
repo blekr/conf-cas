@@ -1,4 +1,5 @@
 /* eslint-disable no-await-in-loop,prefer-destructuring,no-plusplus */
+import findKey from 'lodash/findKey';
 import { CASClient, Message } from '../client/CASClient';
 
 import config from '../config';
@@ -36,17 +37,35 @@ import { upsertFailParticipant } from '../dao/failedParticipant';
 import { upsertCustomMessage } from '../dao/customMessage';
 
 let client;
-let upsertServiceListTime;
-let refreshBridgeListTime;
-const refreshConferenceListTime = {};
-const sessions = {};
+const sessions = {
+  0: {
+    type: 'LS',
+    seq: 0,
+    time: {
+      upsertServiceListTime: null,
+    },
+  },
+};
 
 /*
  * <pre>
  * {
  *   sessionId: {
- *     type: ['BV', 'ACV'],
+ *     type: ['LS', 'BV', 'ACV', 'ACC'],
  *     seq: number,
+ *
+ *     // when LS
+ *     time: {
+ *       upsertServiceListTime: Date,
+ *     }
+ *
+ *     // when BV
+ *     time: {
+ *       refreshBridgeListTime: Date,
+ *       refreshConferenceListTime: {}
+ *     },
+ *
+ *     // when ACV
  *     bridgeId: string,
  *     confId: string,
  *     time: {
@@ -61,39 +80,41 @@ const sessions = {};
  * </pre>
 */
 
-async function upsertServiceList(message) {
-  if (!upsertServiceListTime) {
-    upsertServiceListTime = new Date();
+async function upsertServiceList({ sessionId, params }) {
+  const { time } = sessions[sessionId];
+  if (!time.upsertServiceListTime) {
+    time.upsertServiceListTime = new Date();
   }
-  const m = message.params[0];
-  const n = message.params[1];
-  const count = parseInt(message.params[2], 10);
+  const m = params[0];
+  const n = params[1];
+  const count = parseInt(params[2], 10);
   for (let i = 0; i < count; i += 1) {
-    const key = message.params[3 + i * 3];
-    const name = message.params[3 + i * 3 + 1];
-    const version = message.params[3 + i * 3 + 2];
+    const key = params[3 + i * 3];
+    const name = params[3 + i * 3 + 1];
+    const version = params[3 + i * 3 + 2];
     await upsert({ key, name, version });
   }
   if (m === n) {
-    await removeObs(upsertServiceListTime);
-    upsertServiceListTime = null;
+    await removeObs(time.upsertServiceListTime);
+    time.upsertServiceListTime = null;
   }
 }
 
-async function refreshBridgeList(message) {
-  if (!refreshBridgeListTime) {
-    refreshBridgeListTime = new Date();
+async function refreshBridgeList({ sessionId, params }) {
+  const { time } = sessions[sessionId];
+  if (!time.refreshBridgeListTime) {
+    time.refreshBridgeListTime = new Date();
   }
-  const m = message.params[0];
-  const n = message.params[1];
-  const count = parseInt(message.params[2], 10);
+  const m = params[0];
+  const n = params[1];
+  const count = parseInt(params[2], 10);
   for (let i = 0; i < count; i += 1) {
-    const bridgeId = message.params[3 + i];
+    const bridgeId = params[3 + i];
     await upsertBridge(bridgeId);
   }
   if (m === n) {
-    await removeObsBridge(refreshBridgeListTime);
-    refreshBridgeListTime = null;
+    await removeObsBridge(time.refreshBridgeListTime);
+    time.refreshBridgeListTime = null;
   }
 }
 
@@ -133,10 +154,11 @@ async function updateBridgeAttr({ params }) {
   }
 }
 
-async function refreshConferenceList({ params }) {
+async function refreshConferenceList({ sessionId, params }) {
+  const { time } = sessions[sessionId];
   const bridgeId = params[0];
-  if (!refreshConferenceListTime[bridgeId]) {
-    refreshConferenceListTime[bridgeId] = new Date();
+  if (!time.refreshConferenceListTime[bridgeId]) {
+    time.refreshConferenceListTime[bridgeId] = new Date();
   }
   const m = params[1];
   const n = params[2];
@@ -157,8 +179,8 @@ async function refreshConferenceList({ params }) {
   }
 
   if (m === n) {
-    await removeObsConference(refreshConferenceListTime[bridgeId]);
-    delete refreshConferenceListTime[bridgeId];
+    await removeObsConference(time.refreshConferenceListTime[bridgeId]);
+    delete time.refreshConferenceListTime[bridgeId];
   }
 }
 
@@ -720,6 +742,29 @@ async function onMessage(message) {
   }
 }
 
+function sessionLookup({ serviceType, bridgeId, confId }) {
+  return findKey(
+    sessions,
+    ({ type, bridgeId: savedBridgeId, confId: savedConfId }) => {
+      if (type !== serviceType) {
+        return false;
+      }
+      switch (serviceType) {
+        case 'ACV':
+          return savedBridgeId === bridgeId && savedConfId === confId;
+        case 'ACC': {
+          const bridgeIdEq =
+            bridgeId === savedBridgeId || (!bridgeId && !savedBridgeId);
+          const confIdEq = confId === savedConfId || (!confId && !savedConfId);
+          return bridgeIdEq && confIdEq;
+        }
+        default:
+          return true;
+      }
+    },
+  );
+}
+
 export function startSync() {
   if (client) {
     throw new ServerError('client already exists');
@@ -728,14 +773,138 @@ export function startSync() {
   client = new CASClient({ host: casHost, port: casPort });
   client.on('message', onMessage);
   client.connect();
+}
 
-  // create bridge view session
-  const csMessage = new Message()
-    .sId(0)
-    .seq(0)
-    .mId('LS.CS')
-    .append('BV');
-  client.sendMessage(csMessage);
+export function createSession({ serviceType, bridgeId, confId, params = [] }) {
+  return new Promise((resolve, reject) => {
+    // find if session already exists
+    const sessionIdFound = sessionLookup({ serviceType, bridgeId, confId });
+    if (sessionIdFound) {
+      resolve({ sessionId: sessionIdFound });
+      return;
+    }
+    const seqSend = sessions['0'].seq++;
+    function onMsg({
+      sessionId,
+      sequence,
+      messageId,
+      nak,
+      params: respParams,
+    }) {
+      if (sessionId === '0' && sequence === seqSend && messageId === 'LS.CS') {
+        if (nak) {
+          reject();
+        } else {
+          const newSessionId = respParams[0];
+          sessions[newSessionId] = {
+            type: serviceType,
+            seq: 0,
+          };
+          if (serviceType === 'BV') {
+            sessions[newSessionId].time = {
+              refreshBridgeListTime: null,
+              refreshConferenceListTime: {},
+            };
+          }
+
+          if (serviceType === 'ACV') {
+            sessions[newSessionId].bridgeId = bridgeId;
+            sessions[newSessionId].confId = confId;
+            sessions[newSessionId].time = {
+              participant: null,
+              QA: {
+                moderator: null,
+                queue: null,
+              },
+            };
+          }
+          if (serviceType === 'ACC') {
+            sessions[newSessionId].bridgeId = bridgeId;
+            sessions[newSessionId].confId = confId;
+          }
+          resolve({ sessionId: newSessionId });
+        }
+        client.removeListener('message', onMsg);
+      }
+    }
+    const message = new Message()
+      .sId(0)
+      .seq(seqSend)
+      .mId('LS.CS')
+      .append(serviceType);
+    if (serviceType === 'ACV') {
+      message.append(bridgeId);
+      message.append(confId);
+    }
+    if (serviceType === 'ACC') {
+      if (bridgeId) {
+        message.append(bridgeId);
+      }
+      if (confId) {
+        message.append(confId);
+      }
+    }
+    message.appendMulti(params);
+    client.sendMessage(message);
+    client.on('message', onMsg);
+  });
+}
+
+export function destroySession({ sessionId: sessionIdToDestroy }) {
+  return new Promise((resolve, reject) => {
+    const seqSend = sessions['0'].seq++;
+
+    function onMsg({ sessionId, sequence, messageId, nak }) {
+      if (sessionId === '0' && sequence === seqSend && messageId === 'LS.DS') {
+        if (nak) {
+          reject();
+        } else {
+          delete sessions[sessionIdToDestroy];
+          resolve();
+        }
+        client.removeListener('message', onMsg);
+      }
+    }
+
+    const message = new Message()
+      .sId(0)
+      .seq(seqSend)
+      .mId('LS.DS')
+      .append(sessionIdToDestroy);
+    client.sendMessage(message);
+    client.on('message', onMsg);
+  });
+}
+
+export function sendMessage({
+  sessionId: sessionIdToSend,
+  messageId: messageIdToSend,
+  params: paramsToSend = [],
+}) {
+  return new Promise((resolve, reject) => {
+    const seqSend = sessions[sessionIdToSend].seq++;
+    function onMsg({ sessionId, sequence, messageId, nak, params }) {
+      if (
+        sessionId === sessionIdToSend &&
+        sequence >= seqSend &&
+        messageId === messageIdToSend
+      ) {
+        if (nak) {
+          reject();
+        } else {
+          resolve({ params });
+        }
+        client.removeListener('message', onMsg);
+      }
+    }
+    const message = new Message()
+      .sId(sessionIdToSend)
+      .seq(seqSend)
+      .mId(messageIdToSend)
+      .appendMulti(paramsToSend);
+    client.sendMessage(message);
+    client.on('message', onMsg);
+  });
 }
 
 export function stopSync() {
