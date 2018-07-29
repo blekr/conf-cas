@@ -12,9 +12,9 @@ export function upsertQAModerator({ bridgeId, confId, partyId }) {
   ).exec();
 }
 
-export async function removeObsQAModerator(date) {
+export async function removeObsQAModerator({ bridgeId, confId, date }) {
   return QAModerator.updateMany(
-    { updatedAt: { $lt: date } },
+    { bridgeId, confId, updatedAt: { $lt: date } },
     { $set: { deleted: true } },
   ).exec();
 }

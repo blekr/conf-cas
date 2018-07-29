@@ -3,7 +3,7 @@ import findKey from 'lodash/findKey';
 import { CASClient, Message } from '../client/CASClient';
 
 import config from '../config';
-import { ServerError } from '../errors';
+import { ServerError, SubmitNakError } from '../errors';
 import logger from '../logger';
 import { BridgeInfo } from '../entity/BridgeInfo';
 import { removeObs, upsert } from '../dao/serviceList';
@@ -35,6 +35,10 @@ import { upsertQAPartyState } from '../dao/QAPartyState';
 import { updateVoteTally, upsertVoteQuestion } from '../dao/vote';
 import { upsertFailParticipant } from '../dao/failedParticipant';
 import { upsertCustomMessage } from '../dao/customMessage';
+import {
+  removeObsLiveConference,
+  upsertLiveConference,
+} from '../dao/liveConference';
 
 let client;
 const sessions = {
@@ -62,7 +66,8 @@ const sessions = {
  *     // when BV
  *     time: {
  *       refreshBridgeListTime: Date,
- *       refreshConferenceListTime: {}
+ *       refreshConferenceList: {bridgeId: Date},
+ *       refreshLiveConferenceList: {bridgeId: Date},
  *     },
  *
  *     // when ACV
@@ -157,8 +162,8 @@ async function updateBridgeAttr({ params }) {
 async function refreshConferenceList({ sessionId, params }) {
   const { time } = sessions[sessionId];
   const bridgeId = params[0];
-  if (!time.refreshConferenceListTime[bridgeId]) {
-    time.refreshConferenceListTime[bridgeId] = new Date();
+  if (!time.refreshConferenceList[bridgeId]) {
+    time.refreshConferenceList[bridgeId] = new Date();
   }
   const m = params[1];
   const n = params[2];
@@ -179,8 +184,42 @@ async function refreshConferenceList({ sessionId, params }) {
   }
 
   if (m === n) {
-    await removeObsConference(time.refreshConferenceListTime[bridgeId]);
-    delete time.refreshConferenceListTime[bridgeId];
+    await removeObsConference({
+      bridgeId,
+      date: time.refreshConferenceList[bridgeId],
+    });
+    delete time.refreshConferenceList[bridgeId];
+  }
+}
+
+async function refreshLiveConferenceList({ sessionId, params }) {
+  const { time } = sessions[sessionId];
+  const bridgeId = params[0];
+  const m = params[1];
+  const n = params[2];
+  const count = parseInt(params[3], 10);
+
+  if (!time.refreshLiveConferenceList[bridgeId]) {
+    time.refreshLiveConferenceList[bridgeId] = new Date();
+  }
+  let index = 4;
+  for (let i = 0; i < count; i += 1) {
+    await upsertLiveConference({
+      bridgeId,
+      confId: params[index++],
+      hostCode: params[index++],
+      guestCode: params[index++],
+      accountNumber: params[index++],
+      confActivationTime: params[index++],
+      partition: params[index++],
+    });
+  }
+  if (m === n) {
+    await removeObsLiveConference({
+      bridgeId,
+      date: time.refreshLiveConferenceList,
+    });
+    delete time.refreshLiveConferenceList[bridgeId];
   }
 }
 
@@ -377,7 +416,7 @@ async function refreshParticipantList({ sessionId, params }) {
   }
 
   if (m === n) {
-    await removeObsParticipant(time.participant);
+    await removeObsParticipant({ bridgeId, confId, date: time.participant });
     time.participant = null;
   }
 }
@@ -484,7 +523,11 @@ async function refreshQA({ sessionId, params }) {
         await upsertQAModerator({ bridgeId, confId, partyId: params[index++] });
       }
       if (m === n) {
-        await removeObsQAModerator(time.QA.moderator);
+        await removeObsQAModerator({
+          bridgeId,
+          confId,
+          date: time.QA.moderator,
+        });
         time.QA.moderator = null;
       }
       break;
@@ -506,7 +549,7 @@ async function refreshQA({ sessionId, params }) {
       }
 
       if (m === n) {
-        await removeObsQAQueue(time.QA.queue);
+        await removeObsQAQueue({ bridgeId, confId, date: time.QA.queue });
         time.QA.queue = null;
       }
       break;
@@ -636,6 +679,9 @@ async function onMessage(message) {
       });
       break;
     }
+    case 'BV .B.LCL':
+      await refreshLiveConferenceList(message);
+      break;
 
     // Active Conference: conference’s attributes
     case 'ACV.A': {
@@ -793,7 +839,7 @@ export function createSession({ serviceType, bridgeId, confId, params = [] }) {
     }) {
       if (sessionId === '0' && sequence === seqSend && messageId === 'LS.CS') {
         if (nak) {
-          reject();
+          reject(new SubmitNakError(respParams));
         } else {
           const newSessionId = respParams[0];
           sessions[newSessionId] = {
@@ -803,7 +849,8 @@ export function createSession({ serviceType, bridgeId, confId, params = [] }) {
           if (serviceType === 'BV') {
             sessions[newSessionId].time = {
               refreshBridgeListTime: null,
-              refreshConferenceListTime: {},
+              refreshConferenceList: {},
+              refreshLiveConferenceList: {},
             };
           }
 

@@ -21,9 +21,9 @@ export function removeParticipant({ bridgeId, confId, partyId }) {
   ).exec();
 }
 
-export async function removeObsParticipant(date) {
+export async function removeObsParticipant({ bridgeId, confId, date }) {
   return Participant.updateMany(
-    { updatedAt: { $lt: date } },
+    { bridgeId, confId, updatedAt: { $lt: date } },
     { $set: { deleted: true } },
   ).exec();
 }

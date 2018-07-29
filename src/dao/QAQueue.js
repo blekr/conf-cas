@@ -12,9 +12,9 @@ export function upsertQAQueue({ bridgeId, confId, partyId }) {
   ).exec();
 }
 
-export async function removeObsQAQueue(date) {
+export async function removeObsQAQueue({ bridgeId, confId, date }) {
   return QAQueue.updateMany(
-    { updatedAt: { $lt: date } },
+    { bridgeId, confId, updatedAt: { $lt: date } },
     { $set: { deleted: true } },
   ).exec();
 }
