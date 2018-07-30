@@ -40,6 +40,12 @@ import {
   removeObsLiveConference,
   upsertLiveConference,
 } from '../dao/liveConference';
+import {
+  removeObsOperator,
+  removeOperator,
+  updateOperatorAttr,
+  upsertOperator,
+} from '../dao/operator';
 
 let client;
 const sessions = {
@@ -56,7 +62,7 @@ const sessions = {
  * <pre>
  * {
  *   sessionId: {
- *     type: ['LS', 'BV', 'ACV', 'ACC'],
+ *     type: ['LS', 'BV', 'ACV', 'ACC', 'OV'],
  *     seq: number,
  *
  *     // when LS
@@ -80,6 +86,16 @@ const sessions = {
  *         moderator: Date,
  *         queue: Date,
  *       }
+ *     }
+ *
+ *     // when ACC
+ *     bridgeId: stringOptional,
+ *     confId: stringOptional,
+ *
+ *     // when OV
+ *     bridgeId: string,
+ *     time: {
+ *       operator: Date,
  *     }
  *  }
  * }
@@ -617,6 +633,71 @@ async function upsertVote({ sessionId, params }) {
   }
 }
 
+async function refreshOperator({ sessionId, params }) {
+  const { bridgeId, time } = sessions[sessionId];
+  const m = params[0];
+  const n = params[1];
+  const count = parseInt(params[2], 10);
+
+  if (!time.operator) {
+    time.operator = new Date();
+  }
+
+  let index = 3;
+  for (let i = 0; i < count; i += 1) {
+    await upsertOperator({
+      bridgeId,
+      operatorId: params[index++],
+      operatorName: params[index++],
+    });
+  }
+
+  if (m === n) {
+    await removeObsOperator({ bridgeId, date: time.operator });
+    time.operator = null;
+  }
+}
+
+async function updateOperatorAttributes({ sessionId, params }) {
+  const { bridgeId } = sessions[sessionId];
+  const operatorId = params[0];
+  const type = params[1];
+  switch (type) {
+    case '1': {
+      let index = 2;
+      await updateOperatorAttr({
+        bridgeId,
+        operatorId,
+        type,
+        attr: {
+          operName: params[index++],
+          type: params[index++],
+          vestibuleID: params[index++],
+          viaPartyID: params[index++],
+        },
+      });
+      break;
+    }
+    case '2': {
+      let index = 2;
+      await updateOperatorAttr({
+        bridgeId,
+        operatorId,
+        type,
+        attr: {
+          connectState: params[index++],
+          crntLocID: params[index++],
+          crntConfID: params[index++],
+        },
+      });
+      break;
+    }
+    default:
+      logger.error(`unknown subtype of OV.O.A: ${type}`);
+      break;
+  }
+}
+
 async function onMessage(message) {
   logger.info('got message: ', message);
   if (message.nak) {
@@ -806,6 +887,28 @@ async function onMessage(message) {
       });
       break;
     }
+    case 'OV .OL':
+      await refreshOperator(message);
+      break;
+    case 'OV.O.ADD': {
+      const { sessionId, params } = message;
+      const { bridgeId } = sessions[sessionId];
+      await upsertOperator({
+        bridgeId,
+        operatorId: params[0],
+        operatorName: params[1],
+      });
+      break;
+    }
+    case 'OV .O.DEL': {
+      const { sessionId, params } = message;
+      const { bridgeId } = sessions[sessionId];
+      await removeOperator({ bridgeId, operatorId: params[0] });
+      break;
+    }
+    case 'OV.O.A':
+      await updateOperatorAttributes(message);
+      break;
     default:
       logger.error('unrecognized message: ', message);
       break;
@@ -893,6 +996,12 @@ export function createSession({ serviceType, bridgeId, confId, params = [] }) {
             sessions[newSessionId].bridgeId = bridgeId;
             sessions[newSessionId].confId = confId;
           }
+          if (serviceType === 'OV') {
+            sessions[newSessionId].bridgeId = bridgeId;
+            sessions[newSessionId].time = {
+              operator: null,
+            };
+          }
           resolve({ sessionId: newSessionId });
         }
         client.removeListener('message', onMsg);
@@ -914,6 +1023,9 @@ export function createSession({ serviceType, bridgeId, confId, params = [] }) {
       if (confId) {
         message.append(confId);
       }
+    }
+    if (serviceType === 'OV') {
+      message.append(bridgeId);
     }
     message.appendMulti(params);
     client.sendMessage(message);
