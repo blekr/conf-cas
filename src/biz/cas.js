@@ -727,7 +727,7 @@ async function onMessage(message) {
       await upsertBridge(message.params[0]);
       break;
     }
-    case 'BV .B.DEL': {
+    case 'BV.B.DEL': {
       await removeBridgeById(message.params[0]);
       break;
     }
@@ -762,7 +762,7 @@ async function onMessage(message) {
       });
       break;
     }
-    case 'BV .B.LCL':
+    case 'BV.B.LCL':
       await refreshLiveConferenceList(message);
       break;
     case 'BV.B.LC.ADD': {
@@ -887,7 +887,7 @@ async function onMessage(message) {
       });
       break;
     }
-    case 'OV .OL':
+    case 'OV.OL':
       await refreshOperator(message);
       break;
     case 'OV.O.ADD': {
@@ -900,7 +900,7 @@ async function onMessage(message) {
       });
       break;
     }
-    case 'OV .O.DEL': {
+    case 'OV.O.DEL': {
       const { sessionId, params } = message;
       const { bridgeId } = sessions[sessionId];
       await removeOperator({ bridgeId, operatorId: params[0] });
