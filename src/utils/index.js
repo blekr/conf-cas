@@ -11,6 +11,10 @@
  * Helper functions for data loaders (src/Context.js)
  * -------------------------------------------------------------------------- */
 
+import { ClientError, ServerError } from '../errors';
+import logger from '../logger';
+import { ERROR_CODE } from '../constant';
+
 export function assignType(type: string) {
   return (obj: any) => {
     // eslint-disable-next-line no-underscore-dangle, no-param-reassign
@@ -55,5 +59,46 @@ export function mapToValues(
     const group = new Map(keys.map(key => [key, null]));
     rows.forEach(row => group.set(keyFn(row), valueFn(row)));
     return Array.from(group.values());
+  };
+}
+
+export function getSequenceIndex(path) {
+  const found = path.match(/[0-9]+$/);
+  if (!found) {
+    throw new ServerError(`invalid path: ${path}`);
+  }
+  return parseInt(found[0], 10);
+}
+
+export function str(obj) {
+  return JSON.stringify(obj);
+}
+
+export function buildRouteHandler(fn) {
+  return async (req, res) => {
+    try {
+      const output = await fn({
+        params: req.params,
+        query: req.query,
+        body: req.body,
+      });
+      res.json({
+        data: output || {},
+      });
+    } catch (err) {
+      if (err instanceof ClientError) {
+        logger.warn(`api warning: ${err.stack}`);
+        res.json({
+          errorCode: err.errorCode,
+          errorMessage: err.message,
+        });
+      } else {
+        logger.error(`api error: ${err.stack}`);
+        res.json({
+          errorCode: ERROR_CODE.UNKNOWN,
+          errorMessage: err.message,
+        });
+      }
+    }
   };
 }

@@ -9,25 +9,44 @@
 /* eslint-disable no-console, no-shadow */
 
 import app from './app';
-import db from './db';
-import redis from './redis';
 import errors from './errors';
-import { connectMongoDB } from './entity';
+import logger from './logger';
+import { getEmitter, startOrchestrator } from './biz/orchestrate';
+import { startConnection, stopConnection } from './biz/cas2';
 
 const port = process.env.PORT || 8080;
 const host = process.env.HOSTNAME || '0.0.0.0';
 
-connectMongoDB();
+let server;
 
-// Launch Node.js server
-const server = app.listen(port, host, () => {
-  console.log(`Node.js API server is listening on http://${host}:${port}/`);
-});
+async function start() {
+  getEmitter().once('leader', async ({ index }) => {
+    logger.info('we become the leader');
+    await startConnection({ index });
+  });
+  getEmitter().once('error', async error => {
+    logger.error(`received error from zookeeper: ${error.stack}`);
+    await stopConnection();
+  });
+  await startOrchestrator();
+
+  return new Promise(resolve => {
+    server = app.listen(port, host, resolve);
+  });
+}
+
+start()
+  .then(() => {
+    logger.info(`Node.js API server is listening on http://${host}:${port}/`);
+  })
+  .catch(err => {
+    logger.error(`failed to start: ${err.stack}`);
+  });
 
 // Shutdown Node.js app gracefully
 function handleExit(options, err) {
   if (options.cleanup) {
-    const actions = [server.close, db.destroy, redis.quit];
+    const actions = [server.close];
     actions.forEach((close, i) => {
       try {
         close(() => {

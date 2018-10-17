@@ -68,8 +68,9 @@ export class CASClient extends EventEmitter {
 
   static __XORSUM(message) {
     const sum = Buffer.from([0x0]);
-    for (let i = 0; i < message.length; i += 1) {
-      sum[0] ^= message[i];
+    const msgBuffer = Buffer.from(message);
+    for (let i = 0; i < msgBuffer.length; i += 1) {
+      sum[0] ^= msgBuffer[i];
     }
     sum[0] &= 0x7f;
     return sum.toString('hex', 0, 1);
@@ -77,8 +78,9 @@ export class CASClient extends EventEmitter {
 
   static __BYTESUM(message) {
     const sum = Buffer.from([0x0]);
-    for (let i = 0; i < message.length; i += 1) {
-      sum[0] += message.charCodeAt(i);
+    const msgBuffer = Buffer.from(message);
+    for (let i = 0; i < msgBuffer.length; i += 1) {
+      sum[0] += msgBuffer[i];
     }
     sum[0] &= 0x7f;
     return sum.toString('hex', 0, 1);
