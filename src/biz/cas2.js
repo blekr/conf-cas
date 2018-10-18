@@ -2,40 +2,213 @@
 import { ServerError } from '../errors';
 import config from '../config';
 import logger from '../logger';
-import { CASClient, Message } from '../client/CASClient';
-import { str } from '../utils';
+import { CASClient } from '../client/CASClient';
+import { Message } from '../client/CASMessage';
+import { assertTruth, str } from '../utils';
+import { SessionManager } from '../utils/SessionManager';
+import { ERROR_CODE } from '../constant';
+import { notifyMessage } from '../dao/confServer';
 
 let client;
 let status = 'INIT'; // or CONNECTED, CLOSED
+const sessionManager = new SessionManager();
 
 export function getStatus() {
   return status;
 }
 
+export async function dumpSession() {
+  return {
+    sessions: sessionManager.sessions,
+  };
+}
+
+export async function sendMessage({ bridgeId, confId, messageId, params }) {
+  logger.info(`sendMessage biz: ${str(arguments[0])}`);
+
+  if (!client) {
+    throw new ServerError('client is not available');
+  }
+  const session = sessionManager.lookupSession({
+    type: 'ACC',
+    bridgeId,
+    confId,
+  });
+  assertTruth({
+    value: session,
+    message: `ACC session not found, ${bridgeId}, ${confId}`,
+    errorCode: ERROR_CODE.INVALID_PARAM,
+  });
+
+  const { sessionId } = session;
+  const sequence = sessionManager.seq(sessionId);
+  logger.info(
+    `ACC session found for ${bridgeId}, ${confId}, sessionId: ${sessionId}, seq: ${sequence}`,
+  );
+  client.sendMessage(
+    new Message()
+      .sId(sessionId)
+      .seq(sequence)
+      .mId(messageId)
+      .appendMulti(params),
+  );
+
+  return new Promise((resolve, reject) => {
+    let timer;
+    function onResponse(message) {
+      if (message.sessionId === sessionId && message.sequence >= sequence) {
+        resolve({
+          sessionId: message.sessionId,
+          seqSent: sequence,
+          seqReceived: message.sequence,
+          messageId: message.messageId,
+          nak: message.nak,
+          params: message.params,
+        });
+        clearTimeout(timer);
+        client.removeListener('message', onResponse);
+      }
+    }
+    client.on('message', onResponse);
+
+    logger.info(
+      `timer for waiting response is created: ${bridgeId}, ${confId}`,
+    );
+    timer = setTimeout(() => {
+      client.removeListener('message', onResponse);
+      reject(
+        new ServerError(
+          `timeout waiting cas response for seq ${sequence}, ${bridgeId}, ${confId}, ${messageId}`,
+        ),
+      );
+    }, 5000);
+  });
+}
+
+function createSession({ type, bridgeId, confId }) {
+  if (sessionManager.lookupSession({ type, bridgeId, confId })) {
+    logger.info(
+      `${type} session already exists for conference: ${bridgeId}:${confId}`,
+    );
+    return;
+  }
+  logger.info(`create ${type} session for conference ${bridgeId}:${confId}`);
+
+  const sequence = sessionManager.seq(0);
+  client.sendMessage(
+    new Message()
+      .sId(0)
+      .seq(sequence)
+      .mId('LS.CS')
+      .append(type)
+      .append(bridgeId)
+      .append(confId),
+  );
+  sessionManager.createSession({
+    type,
+    bridgeId,
+    confId,
+    creationSeq: sequence,
+  });
+}
+
+function removeSession({ type, bridgeId, confId }) {
+  const session = sessionManager.lookupSession({ type, bridgeId, confId });
+  if (!session) {
+    logger.warn(
+      `removeSession: session not found, can not remove: ${type}, ${bridgeId}, ${confId}`,
+    );
+    return;
+  }
+  client.sendMessage(
+    new Message()
+      .sId(0)
+      .seq(sessionManager.seq(0))
+      .mId('LS.DS')
+      .append(session.sessionId),
+  );
+  sessionManager.deleteSession(session.sessionId);
+}
+
 async function onMessage(message) {
-  // const { confServer: { host, port } } = config;
-  // if (message.params.length === 1 && message.params[0] === 'LT') {
-  //   client.sendMessage(new Message(['LT']));
-  //   return;
-  // }
-  // logger.info(`<-- ${message.params.join('~')}`);
-  //
-  // if (host && port) {
-  //   logger.info(`sending message to conf-service service: ${host}:${port}`);
-  //   const result = await rp({
-  //     uri: `http://${host}:${port}/sys/rtbi/params`,
-  //     method: 'POST',
-  //     headers: {
-  //       'internal-key': config.internalKey,
-  //     },
-  //     body: {
-  //       params: message.params,
-  //     },
-  //     json: true,
-  //     timeout: 8000,
-  //   });
-  //   logger.info(`conf-service return: ${str(result)}`);
-  // }
+  const { confServer: { host, port } } = config;
+
+  logger.info(`begin processing message: ${message.build()}`);
+
+  // send every message to conf-server
+  if (host && port) {
+    // no wait
+    notifyMessage({
+      sessionId: message.sessionId,
+      sequence: message.sequence,
+      messageId: message.messageId,
+      nak: message.nak,
+      params: message.params,
+    });
+  }
+
+  // session is created: update sessionId to session manager
+  if (message.sessionId === 0 && message.messageId === 'LS.CS') {
+    const svcKey = message.params[0];
+    const sessionId = message.params[1];
+    if (!sessionId) {
+      logger.warn(`sessionId is empty: ${sessionId}`);
+      return;
+    }
+    logger.info(
+      `updateSessionId: ${svcKey}, ${message.sequence}, ${sessionId}`,
+    );
+    sessionManager.updateSessionId({
+      type: svcKey,
+      creationSeq: message.sequence,
+      sessionId,
+    });
+    return;
+  }
+  if (message.sessionId === 0 && message.messageId === 'LS.DS') {
+    const sessionId = message.params[0];
+    if (sessionId) {
+      logger.info(`LS.DS: delete session: ${sessionId}`);
+      sessionManager.deleteSession(sessionId);
+    } else {
+      logger.warn(`LS.DS: session is empty: ${sessionId}`);
+    }
+    return;
+  }
+
+  // active conference list: create ACV and ACC session
+  if (message.messageId === 'BV.B.ACL') {
+    const bridgeId = message.params[0];
+    const m = message.params[1];
+    const n = message.params[2];
+    const confCount = message.params[3];
+    logger.info(
+      `receive active conference list: ${bridgeId}, ${m}:${n}, ${confCount}`,
+    );
+    for (let i = 0; i < confCount; i += 1) {
+      const confId = message.params[4 + i * 7];
+      createSession({ type: 'ACV', bridgeId, confId });
+      createSession({ type: 'ACC', bridgeId, confId });
+    }
+    return;
+  }
+
+  // active conference added: create ACV and ACC session
+  if (message.messageId === 'BV.B.AC.ADD') {
+    const bridgeId = message.params[0];
+    const confId = message.params[1];
+    createSession({ type: 'ACV', bridgeId, confId });
+    createSession({ type: 'ACC', bridgeId, confId });
+    return;
+  }
+
+  // active conference removed: remove ACV and ACC session
+  if (message.messageId === 'BV.B.AC.DEL') {
+    const bridgeId = message.params[0];
+    const confId = message.params[1];
+    removeSession({ type: 'ACV', bridgeId, confId });
+    removeSession({ type: 'ACC', bridgeId, confId });
+  }
 }
 
 export async function startConnection({ index }) {
@@ -59,11 +232,28 @@ export async function startConnection({ index }) {
   await client.connect();
 
   logger.info('connection established');
-
   status = 'CONNECTED';
+
+  const sequence = sessionManager.seq(0);
+
+  logger.info(`create bridge view session: ${sequence}`);
+  client.sendMessage(
+    new Message()
+      .sId(0)
+      .seq(sequence)
+      .mId('LS.CS')
+      .append('BV'),
+  );
+  sessionManager.createSession({
+    type: 'BV',
+    bridgeId: null,
+    confId: null,
+    creationSeq: sequence,
+  });
 }
 
 export async function stopConnection() {
+  logger.info(`stop connection: ${!!client}`);
   if (client) {
     client.removeListener('message', onMessage);
     client.close();

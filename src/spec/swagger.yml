@@ -1,0 +1,80 @@
+swagger: "2.0"
+info:
+  version: ""
+  title: "API for conf-cas backend"
+  license:
+    name:
+
+tags:
+  - name: "cas"
+    description: "everything about cas"
+
+schemes:
+  - "http"
+
+definitions:
+  errorFields: &errorFields
+    errorCode:
+      type: "string"
+      enum: ['UNKNOWN', 'FORBIDDEN', 'INVALID_PARAM', 'INVALID_TOKEN', 'TOKEN_KICKED_OUT', 'CONSTRAINT_ERROR']
+    errorMessage: {type: "string"}
+  casResultSchema: &casResultSchema
+    type: "object"
+    properties:
+      sessionId: {type: "string"}
+      seqSent: {type: "string"}
+      seqReceived: {type: "string"}
+      messageId: {type: "string"}
+      nak: {type: "boolean"}
+      params:
+        type: "array"
+        items:
+          type: "string"
+  sessionSchema: &sessionSchema
+    type: "object"
+    properties:
+      sessionId: {type: "string"}
+      seq: {type: "integer"}
+      type: {type: "string"}
+      bridgeId: {type: "string"}
+      confId: {type: "string"}
+      creationSeq: {type: "string"}
+      createdAt: {type: "string", format: "date-time"}
+      visitedAt: {type: "string", format: "date-time"}
+paths:
+  /cas/send:
+    post:
+      summary: "send a active conference control message"
+      operationId:
+      parameters: "sendToCas"
+      responses:
+        200:
+          description: "successful operation"
+          schema:
+            type: "object"
+            properties:
+              <<: *errorFields
+              data: *casResultSchema
+  /cas/sessions:
+    get:
+      summary: "dump cas session"
+      operationId:
+      parameters:
+      responses:
+        200:
+          description: "successful operation"
+          schema:
+            type: "object"
+            properties:
+              <<: *errorFields
+              data:
+                type: "object"
+                properties:
+                  sessions:
+                    type: "array"
+                    items: *sessionSchema
+
+
+
+
+

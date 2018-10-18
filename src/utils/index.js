@@ -102,3 +102,45 @@ export function buildRouteHandler(fn) {
     }
   };
 }
+
+export function assertTruth({
+  value,
+  errorCode = ERROR_CODE.UNKNOWN,
+  message,
+  serverError,
+}) {
+  if (!value) {
+    if (serverError) {
+      throw new ServerError(message);
+    } else {
+      throw new ClientError(errorCode, message);
+    }
+  }
+}
+
+export function delay(milliSeconds) {
+  return new Promise(resolve => {
+    setTimeout(resolve, milliSeconds);
+  });
+}
+
+export function getJTestExtend() {
+  return {
+    toBeError(received, errorCode) {
+      if (received.errorCode === errorCode) {
+        return {
+          pass: true,
+          message: () =>
+            `received errorCode is equal to ${errorCode}: ${received.stack}`,
+        };
+      }
+      return {
+        pass: false,
+        message: () =>
+          `received errorCode ${
+            received.errorCode
+          } is not equal to ${errorCode}: ${received.stack}`,
+      };
+    },
+  };
+}

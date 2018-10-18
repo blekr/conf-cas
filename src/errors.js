@@ -46,7 +46,12 @@ export class ForbiddenError extends Error {
 }
 
 export class ServerError extends Error {}
-export class ClientError extends Error {}
+export class ClientError extends Error {
+  constructor(errorCode, errorMessage) {
+    super(errorMessage);
+    this.errorCode = errorCode;
+  }
+}
 export class SubmitNakError extends ClientError {
   constructor(params) {
     super('request to Submit is naked');

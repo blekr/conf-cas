@@ -1,6 +1,7 @@
 /* eslint-disable no-await-in-loop,prefer-destructuring,no-plusplus */
 import findKey from 'lodash/findKey';
-import { CASClient, Message } from '../client/CASClient';
+import { CASClient } from '../client/CASClient';
+import { Message } from '../client/CASMessage';
 
 import config from '../config';
 import { ServerError, SubmitNakError } from '../errors';

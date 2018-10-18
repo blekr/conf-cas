@@ -1,59 +1,8 @@
-/* eslint-disable no-bitwise,no-underscore-dangle */
+/* eslint-disable no-bitwise,no-underscore-dangle,import/prefer-default-export */
 import EventEmitter from 'events';
 import net from 'net';
-
-// msg is string representation of Message instance
-export class Message {
-  static fromMsg(msg) {
-    const items = msg.split('~');
-    const [sId, seq, mId, ...rest] = items;
-    const nak = mId[0] === '-';
-    const replaced = mId.replace('-', '');
-    return new Message()
-      .sId(sId)
-      .seq(parseInt(seq, 10))
-      .mId(replaced)
-      .naked(nak)
-      .appendMulti(rest);
-  }
-  constructor() {
-    this.params = [];
-  }
-  sId(sessionId) {
-    this.sessionId = sessionId;
-    return this;
-  }
-
-  seq(sequence) {
-    this.sequence = sequence;
-    return this;
-  }
-
-  mId(messageId) {
-    this.messageId = messageId;
-    return this;
-  }
-
-  naked(nak) {
-    this.nak = nak;
-  }
-
-  append(p) {
-    this.params.push(p);
-    return this;
-  }
-
-  appendMulti(params) {
-    this.params = this.params.concat(params);
-  }
-
-  build() {
-    const items = [this.sessionId, this.sequence, this.messageId].concat(
-      this.params,
-    );
-    return items.join('~');
-  }
-}
+import logger from '../logger';
+import { Message } from './CASMessage';
 
 export class CASClient extends EventEmitter {
   constructor({ host, port }) {
@@ -106,6 +55,7 @@ export class CASClient extends EventEmitter {
       const message = Message.fromMsg(msg);
       this.received = this.received.slice(end + 1);
       this.emit('message', message);
+      logger.info(`<-- ${msg}`);
     }
   }
 
@@ -127,6 +77,7 @@ export class CASClient extends EventEmitter {
 
     const pkg = `\x02${msg}${xorSum}${byteSum}\x03`;
     this.client.write(pkg);
+    logger.info(`--> ${msg}`);
   }
 
   close() {

@@ -7,6 +7,11 @@
 
 /* @flow */
 
+import map from 'lodash/map';
+import validate from 'express-validation';
+import swaggerUi from 'swagger-ui-express';
+import fs from 'fs';
+import yaml from 'js-yaml';
 import morgan from 'morgan';
 import express from 'express';
 import compression from 'compression';
@@ -15,6 +20,15 @@ import bodyParser from 'body-parser';
 import PrettyError from 'pretty-error';
 import { healthRouter } from './routes/health';
 import { permissionCheck } from './middleware/permissionCheck';
+import { resolveSwaggerDefinition } from './utils/swagger';
+import { casRouter } from './routes/cas';
+import { ERROR_CODE } from './constant';
+import logger from './logger';
+
+const swaggerDocument = yaml.safeLoad(
+  fs.readFileSync('./spec/swagger.yml', 'utf8'),
+);
+swaggerDocument.info.version = require('../package').version;
 
 const app = express();
 
@@ -31,12 +45,36 @@ app.use(
 app.use(permissionCheck());
 
 app.use('/health', healthRouter);
+app.use('/cas', casRouter);
+
+app.use(
+  '/swagger',
+  swaggerUi.serve,
+  swaggerUi.setup(resolveSwaggerDefinition(swaggerDocument), {
+    explorer: true,
+    swaggerOptions: {
+      showCommonExtensions: true,
+    },
+  }),
+);
 
 const pe = new PrettyError();
 pe.skipNodeFiles();
 pe.skipPackage('express');
 
 app.use((err, req, res, next) => {
+  if (err instanceof validate.ValidationError) {
+    const errorMessage = map(
+      err.errors,
+      ({ field, messages }) => `${field.join(',')}: ${messages.join(',')}`,
+    ).join(';');
+    res.json({
+      errorCode: ERROR_CODE.INVALID_PARAM,
+      errorMessage,
+    });
+    logger.warn(`api warning: ${errorMessage}`);
+    return;
+  }
   process.stderr.write(pe.render(err));
   next();
 });
