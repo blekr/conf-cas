@@ -1,0 +1,11 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: conf-passcode-service
+spec:
+  selector:
+    app: conf-passcode
+  ports:
+  - protocol: TCP
+    port: 8080
+    targetPort: 8080

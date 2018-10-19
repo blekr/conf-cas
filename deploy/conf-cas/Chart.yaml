@@ -1,0 +1,12 @@
+apiVersion: v1
+name: conf-passcode
+version: 0.0.0
+appVersion: 0.0.0
+description: passcode protocol implementation for conference
+keywords:
+- passcode
+- conference
+maintainers:
+- name: blekr
+  email: wencs@shinet.com.cn
+engine: gotpl

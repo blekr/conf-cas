@@ -1,0 +1,10 @@
+cas:
+confServer:
+  host:
+  port:
+zookeeper:
+  host: ''
+  port: 0
+  root: ''
+image:
+  tag: "0.0.0"

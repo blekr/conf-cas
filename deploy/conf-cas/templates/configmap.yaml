@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: conf-cas-config
+data:
+  CONF_SERVER_HOST: "{{ .Values.confServer.host }}"
+  CONF_SERVER_PORT: "{{ .Values.confServer.port }}"
+  CAS: "{{ .Values.cas }}"
+  ZOOKEEPER_HOST: "{{ .Values.zookeeper.host }}"
+  ZOOKEEPER_PORT: "{{ .Values.zookeeper.port }}"
+  ZOOKEEPER_ROOT: "{{ .Values.zookeeper.root }}"

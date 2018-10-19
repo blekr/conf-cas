@@ -1,0 +1,44 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: conf-cas
+  labels:
+    app: conf-cas
+spec:
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: conf-cas
+    spec:
+      containers:
+      - name: conf-cas
+        image: registry.tools.shinet.com.cn:32000/repos/conf-cas:{{ .Values.image.tag }}
+        imagePullPolicy: Always
+        ports:
+          - containerPort: 8080
+        envFrom:
+          - configMapRef:
+              name: conf-cas-config
+        livenessProbe:
+          httpGet:
+            path: /health/liveness
+            port: 8080
+            httpHeaders:
+            - name: internal-key
+              value: NzlhYzMwNmYxYjQ1N2U2OTI2MDdlNjc0
+          initialDelaySeconds: 15
+          timeoutSeconds: 2
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health/readiness
+            port: 8080
+            httpHeaders:
+            - name: internal-key
+              value: NzlhYzMwNmYxYjQ1N2U2OTI2MDdlNjc0
+          initialDelaySeconds: 15
+          timeoutSeconds: 2
+          periodSeconds: 2
+      imagePullSecrets:
+        - name: regcred-gitlab
