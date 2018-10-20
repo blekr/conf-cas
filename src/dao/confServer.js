@@ -10,6 +10,8 @@ export async function notifyMessage({
   messageId,
   nak,
   params,
+  bridgeId,
+  confId,
 }) {
   const { confServer: { host, port } } = config;
 
@@ -28,11 +30,13 @@ export async function notifyMessage({
       messageId,
       nak,
       params,
+      bridgeId,
+      confId,
     },
     json: true,
     timeout: 8000,
   });
 
-  logger.info(`conf-server return: ${str(result)}`);
+  logger.info(`notifyMessage: conf-server return: ${str(result)}`);
   return result;
 }

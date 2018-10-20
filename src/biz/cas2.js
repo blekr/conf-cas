@@ -138,12 +138,19 @@ async function onMessage(message) {
   // send every message to conf-server
   if (host && port) {
     // no wait
+    const session = sessionManager.lookupSession({
+      sessionId: message.sessionId,
+    });
     notifyMessage({
       sessionId: message.sessionId,
       sequence: message.sequence,
       messageId: message.messageId,
       nak: message.nak,
       params: message.params,
+      bridgeId: session && message.bridgeId,
+      confId: session && message.confId,
+    }).catch(err => {
+      logger.error(`notifyMessage error: ${err.stack}`);
     });
   }
 
