@@ -23,14 +23,20 @@ export async function dumpSession() {
   };
 }
 
-export async function sendMessage({ bridgeId, confId, messageId, params }) {
+export async function sendMessage({
+  bridgeId,
+  confId,
+  type,
+  messageId,
+  params,
+}) {
   logger.info(`sendMessage biz: ${str(arguments[0])}`);
 
   if (!client) {
     throw new ServerError('client is not available');
   }
   const session = sessionManager.lookupSession({
-    type: 'ACC',
+    type,
     bridgeId,
     confId,
   });

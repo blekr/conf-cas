@@ -5,6 +5,10 @@ export default {
     body: {
       bridgeId: joi.string().required(),
       confId: joi.string().required(),
+      type: joi
+        .string()
+        .valid(['ACC', 'ACV'])
+        .required(),
       messageId: joi.string().required(),
       params: joi.array().items(joi.string()),
     },

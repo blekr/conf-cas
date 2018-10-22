@@ -84,6 +84,7 @@ describe('cas biz', () => {
     const result = sendMessage({
       bridgeId: 'bridgeId0',
       confId: 'confId0',
+      type: 'ACC',
       messageId: 'anything',
       params: [],
     });
@@ -105,6 +106,7 @@ describe('cas biz', () => {
     const result = await sendMessage({
       bridgeId: 'bridgeId0',
       confId: 'confId0',
+      type: 'ACC',
       messageId: 'anything',
       params: [],
     });
