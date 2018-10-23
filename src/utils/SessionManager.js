@@ -8,7 +8,7 @@ export class SessionManager {
   constructor() {
     this.sessions = [
       {
-        sessionId: 0,
+        sessionId: '0',
         seq: 1,
         type: 'LS',
         bridgeId: null,

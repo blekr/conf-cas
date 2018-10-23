@@ -12,7 +12,7 @@ export class CASClient extends EventEmitter {
       port,
     };
     this.client = null;
-    this.received = null;
+    this.received = Buffer.alloc(0);
   }
 
   static __XORSUM(message) {
@@ -22,7 +22,7 @@ export class CASClient extends EventEmitter {
       sum[0] ^= msgBuffer[i];
     }
     sum[0] &= 0x7f;
-    return sum.toString('hex', 0, 1);
+    return sum.toString('hex', 0, 1).toUpperCase();
   }
 
   static __BYTESUM(message) {
@@ -32,14 +32,14 @@ export class CASClient extends EventEmitter {
       sum[0] += msgBuffer[i];
     }
     sum[0] &= 0x7f;
-    return sum.toString('hex', 0, 1);
+    return sum.toString('hex', 0, 1).toUpperCase();
   }
 
   __onData(data) {
     if (data instanceof Buffer) {
-      this.received = Buffer.concat(this.received, data);
+      this.received = Buffer.concat([this.received, data]);
     } else {
-      this.received = Buffer.concat(this.received, Buffer.from(data));
+      this.received = Buffer.concat([this.received, Buffer.from(data)]);
     }
 
     while (true) {
@@ -63,7 +63,18 @@ export class CASClient extends EventEmitter {
     const { host, port } = this.options;
     this.client = new net.Socket();
     this.client.connect(port, host);
-    this.client.on('data', this.__onData);
+    this.client.on('data', data => this.__onData(data));
+
+    this.client.on('close', hadError => {
+      logger.error(
+        `connection to ${host}:${port} closed, hadError: ${hadError}`,
+      );
+      this.emit('close', hadError);
+    });
+    this.client.on('error', err =>
+      logger.error(`connection error: ${err.stack}`),
+    );
+
     return new Promise((resolve, reject) => {
       this.client.once('connect', resolve);
       this.client.once('error', reject);

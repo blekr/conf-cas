@@ -1,10 +1,10 @@
 kind: Service
 apiVersion: v1
 metadata:
-  name: conf-passcode-service
+  name: conf-cas-service
 spec:
   selector:
-    app: conf-passcode
+    app: conf-cas
   ports:
   - protocol: TCP
     port: 8080

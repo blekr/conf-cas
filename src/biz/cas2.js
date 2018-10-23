@@ -100,7 +100,7 @@ function createSession({ type, bridgeId, confId }) {
   }
   logger.info(`create ${type} session for conference ${bridgeId}:${confId}`);
 
-  const sequence = sessionManager.seq(0);
+  const sequence = sessionManager.seq('0');
   client.sendMessage(
     new Message()
       .sId(0)
@@ -129,7 +129,7 @@ function removeSession({ type, bridgeId, confId }) {
   client.sendMessage(
     new Message()
       .sId(0)
-      .seq(sessionManager.seq(0))
+      .seq(sessionManager.seq('0'))
       .mId('LS.DS')
       .append(session.sessionId),
   );
@@ -153,15 +153,15 @@ async function onMessage(message) {
       messageId: message.messageId,
       nak: message.nak,
       params: message.params,
-      bridgeId: session && message.bridgeId,
-      confId: session && message.confId,
+      bridgeId: (session && session.bridgeId) || undefined,
+      confId: (session && session.confId) || undefined,
     }).catch(err => {
       logger.error(`notifyMessage error: ${err.stack}`);
     });
   }
 
   // session is created: update sessionId to session manager
-  if (message.sessionId === 0 && message.messageId === 'LS.CS') {
+  if (message.sessionId === '0' && message.messageId === 'LS.CS') {
     const svcKey = message.params[0];
     const sessionId = message.params[1];
     if (!sessionId) {
@@ -247,12 +247,12 @@ export async function startConnection({ index }) {
   logger.info('connection established');
   status = 'CONNECTED';
 
-  const sequence = sessionManager.seq(0);
+  const sequence = sessionManager.seq('0');
 
   logger.info(`create bridge view session: ${sequence}`);
   client.sendMessage(
     new Message()
-      .sId(0)
+      .sId('0')
       .seq(sequence)
       .mId('LS.CS')
       .append('BV'),

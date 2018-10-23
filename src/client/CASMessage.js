@@ -32,6 +32,7 @@ export class Message {
 
   naked(nak) {
     this.nak = nak;
+    return this;
   }
 
   append(p) {
