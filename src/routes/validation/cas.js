@@ -10,7 +10,7 @@ export default {
         .valid(['ACC', 'ACV'])
         .required(),
       messageId: joi.string().required(),
-      params: joi.array().items(joi.string()),
+      params: joi.array().items(joi.string().allow('')),
     },
   },
 };
