@@ -70,7 +70,7 @@ describe('cas biz', () => {
     emitter.emit(
       'message',
       new Message()
-        .sId(0)
+        .sId('0')
         .seq(3)
         .mId('LS.CS')
         .append('ACC')
@@ -122,7 +122,7 @@ describe('cas biz', () => {
     emitter.emit(
       'message',
       new Message()
-        .sId(0)
+        .sId('0')
         .seq(0)
         .mId('LS.DS')
         .append('sessionIdACC'),

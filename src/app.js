@@ -37,16 +37,16 @@ app.use(cookieParser());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
+app.use(permissionCheck());
+app.use('/health', healthRouter);
+
 app.use(
   morgan(
     '[info]: :remote-addr - :remote-user [:date[clf]] ":method :url HTTP/:http-version" :status :res[content-length] ":referrer" ":user-agent"',
   ),
 );
-app.use(permissionCheck());
 
-app.use('/health', healthRouter);
 app.use('/cas', casRouter);
-
 app.use(
   '/swagger',
   swaggerUi.serve,

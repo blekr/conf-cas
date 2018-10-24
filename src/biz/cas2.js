@@ -178,7 +178,7 @@ async function onMessage(message) {
     });
     return;
   }
-  if (message.sessionId === 0 && message.messageId === 'LS.DS') {
+  if (message.sessionId === '0' && message.messageId === 'LS.DS') {
     const sessionId = message.params[0];
     if (sessionId) {
       logger.info(`LS.DS: delete session: ${sessionId}`);
