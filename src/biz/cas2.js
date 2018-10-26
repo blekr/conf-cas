@@ -1,4 +1,4 @@
-/* eslint-disable prefer-rest-params */
+/* eslint-disable prefer-rest-params,no-underscore-dangle */
 import { ServerError } from '../errors';
 import config from '../config';
 import logger from '../logger';
@@ -21,6 +21,48 @@ export async function dumpSession() {
   return {
     sessions: sessionManager.sessions,
   };
+}
+
+function _sendMessage(message) {
+  client.sendMessage(message);
+
+  return new Promise((resolve, reject) => {
+    let timer;
+    function onResponse(responseMessage) {
+      if (
+        responseMessage.sessionId === message.sessionId &&
+        responseMessage.sequence >= message.sequence
+      ) {
+        resolve({
+          sessionId: responseMessage.sessionId,
+          seqSent: message.sequence,
+          seqReceived: responseMessage.sequence,
+          messageId: responseMessage.messageId,
+          nak: responseMessage.nak,
+          params: responseMessage.params,
+        });
+        clearTimeout(timer);
+        client.removeListener('message', onResponse);
+        logger.info(
+          `client sendMessage successfully: ${message} -> ${responseMessage}`,
+        );
+      }
+    }
+    client.on('message', onResponse);
+
+    logger.info(`timer for waiting response is created: ${message}`);
+    timer = setTimeout(() => {
+      client.removeListener('message', onResponse);
+      reject(
+        new ServerError(
+          `timeout waiting cas response for ${message.sessionId}, ${
+            message.sequence
+          }, ${message.messageId}`,
+        ),
+      );
+      logger.info(`client sendMessage timeout: ${message}`);
+    }, 5000);
+  });
 }
 
 export async function sendMessage({
@@ -49,46 +91,16 @@ export async function sendMessage({
   const { sessionId } = session;
   const sequence = sessionManager.seq(sessionId);
   logger.info(
-    `ACC session found for ${bridgeId}, ${confId}, sessionId: ${sessionId}, seq: ${sequence}`,
+    `session found for ${type}, ${bridgeId}, ${confId}, sessionId: ${sessionId}, seq: ${sequence}`,
   );
-  client.sendMessage(
+
+  return _sendMessage(
     new Message()
       .sId(sessionId)
       .seq(sequence)
       .mId(messageId)
       .appendMulti(params),
   );
-
-  return new Promise((resolve, reject) => {
-    let timer;
-    function onResponse(message) {
-      if (message.sessionId === sessionId && message.sequence >= sequence) {
-        resolve({
-          sessionId: message.sessionId,
-          seqSent: sequence,
-          seqReceived: message.sequence,
-          messageId: message.messageId,
-          nak: message.nak,
-          params: message.params,
-        });
-        clearTimeout(timer);
-        client.removeListener('message', onResponse);
-      }
-    }
-    client.on('message', onResponse);
-
-    logger.info(
-      `timer for waiting response is created: ${bridgeId}, ${confId}`,
-    );
-    timer = setTimeout(() => {
-      client.removeListener('message', onResponse);
-      reject(
-        new ServerError(
-          `timeout waiting cas response for seq ${sequence}, ${bridgeId}, ${confId}, ${messageId}`,
-        ),
-      );
-    }, 5000);
-  });
 }
 
 function createSession({ type, bridgeId, confId }) {

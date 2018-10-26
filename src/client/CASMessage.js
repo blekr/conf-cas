@@ -51,4 +51,8 @@ export class Message {
     );
     return items.join('~');
   }
+
+  toString() {
+    return `${this.sessionId}:${this.sequence}:${this.messageId}`;
+  }
 }
