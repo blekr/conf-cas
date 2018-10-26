@@ -7,7 +7,7 @@ import {
 import { dumpSession, sendMessage, startConnection } from '../cas2';
 import logger from '../../logger';
 import { Message } from '../../client/CASMessage';
-import { getJTestExtend } from '../../utils';
+import { delay, getJTestExtend } from '../../utils';
 
 jest.mock('../../logger');
 jest.mock('../../client/CASClient');
@@ -25,9 +25,28 @@ beforeEach(() => {
 
 describe('cas biz', () => {
   test('on start, a bridge view session is created', async () => {
+    setTimeout(async () => {
+      emitter.emit(
+        'message',
+        new Message()
+          .sId('0')
+          .seq(1)
+          .mId('LS.LICENSE'),
+      );
+      await delay(1000);
+      emitter.emit(
+        'message',
+        new Message()
+          .sId('0')
+          .seq(2)
+          .mId('BV'),
+      );
+    }, 2000);
+
     await startConnection({ index: 1 });
-    expect(CASClientSendMessage.mock.calls.length).toBe(1);
-    expect(CASClientSendMessage.mock.calls[0][0].messageId).toBe('LS.CS');
+    expect(CASClientSendMessage.mock.calls.length).toBe(2);
+    expect(CASClientSendMessage.mock.calls[0][0].messageId).toBe('LS.LICENSE');
+    expect(CASClientSendMessage.mock.calls[1][0].messageId).toBe('LS.CS');
     const { sessions } = await dumpSession();
     expect(sessions.length).toBe(2);
     expect(sessions[1].type).toBe('BV');
@@ -71,7 +90,7 @@ describe('cas biz', () => {
       'message',
       new Message()
         .sId('0')
-        .seq(3)
+        .seq(4)
         .mId('LS.CS')
         .append('ACC')
         .append('sessionIdACC'),
@@ -99,7 +118,7 @@ describe('cas biz', () => {
         'message',
         new Message()
           .sId('sessionIdACC')
-          .seq(4)
+          .seq(100)
           .mId('anything'),
       );
     }, 2000);

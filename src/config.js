@@ -12,6 +12,7 @@ function parseCASs(casStr) {
 export default {
   internalKey: 'NzlhYzMwNmYxYjQ1N2U2OTI2MDdlNjc0',
   casList: process.env.CAS ? parseCASs(process.env.CAS) : [],
+  casLicense: 'WAOERZB5G9',
   confServer: {
     host: process.env.CONF_SERVER_HOST,
     port: process.env.CONF_SERVER_PORT,

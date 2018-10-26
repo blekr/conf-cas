@@ -240,7 +240,7 @@ export async function startConnection({ index }) {
   if (client) {
     throw new ServerError('client already exists');
   }
-  const { casList } = config;
+  const { casList, casLicense } = config;
   const { host, port } = casList[index % casList.length];
 
   logger.info(`start connection: index: ${index}, ${host}:${port}`);
@@ -254,27 +254,37 @@ export async function startConnection({ index }) {
     );
     process.exit();
   });
+
   await client.connect();
-
   logger.info('connection established');
-  status = 'CONNECTED';
 
-  const sequence = sessionManager.seq('0');
-
-  logger.info(`create bridge view session: ${sequence}`);
-  client.sendMessage(
+  let sequence = sessionManager.seq('0');
+  await _sendMessage(
     new Message()
       .sId('0')
       .seq(sequence)
-      .mId('LS.CS')
-      .append('BV'),
+      .mId('LS.LICENSE')
+      .append(casLicense),
   );
+  status = 'CONNECTED';
+  logger.info(`registry successfully`);
+
+  sequence = sessionManager.seq('0');
+  logger.info(`create bridge view session: ${sequence}`);
   sessionManager.createSession({
     type: 'BV',
     bridgeId: null,
     confId: null,
     creationSeq: sequence,
   });
+  await _sendMessage(
+    new Message()
+      .sId('0')
+      .seq(sequence)
+      .mId('LS.CS')
+      .append('BV'),
+  );
+  logger.info(`bridge view session created successfully`);
 }
 
 export async function stopConnection() {
