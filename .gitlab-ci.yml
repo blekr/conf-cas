@@ -38,7 +38,7 @@ deploy-beta:
       --install
       --recreate-pods
       --namespace beta-conf-cas
-      --set "cas=172.24.4.101:25200"
+      --set "cas=172.24.4.101:39200"
       --set "confServer.host=conf-server-service.beta-conf-server.svc.cluster.local"
       --set "confServer.port=8080"
       --set "zookeeper.host=zookeeper.zookeeper.svc.cluster.local"
