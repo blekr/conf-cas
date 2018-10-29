@@ -13,6 +13,7 @@ import errors from './errors';
 import logger from './logger';
 import { getEmitter, startOrchestrator } from './biz/orchestrate';
 import { startConnection, stopConnection } from './biz/cas2';
+import { startNotify, stopNotify } from './biz/casNotify';
 
 const port = process.env.PORT || 8080;
 const host = process.env.HOSTNAME || '0.0.0.0';
@@ -22,11 +23,13 @@ let server;
 async function start() {
   getEmitter().once('leader', async ({ index }) => {
     logger.info('we become the leader');
+    startNotify();
     await startConnection({ index });
   });
   getEmitter().once('error', async error => {
     logger.error(`received error from zookeeper: ${error.stack}`);
     await stopConnection();
+    stopNotify();
   });
   await startOrchestrator();
 

@@ -7,7 +7,7 @@ import { Message } from '../client/CASMessage';
 import { assertTruth, str } from '../utils';
 import { SessionManager } from '../utils/SessionManager';
 import { ERROR_CODE } from '../constant';
-import { notifyMessage } from '../dao/confServer';
+import { addMessage } from './casNotify';
 
 let client;
 let status = 'INIT'; // or CONNECTED, CLOSED
@@ -155,11 +155,10 @@ async function onMessage(message) {
 
   // send every message to conf-server
   if (host && port) {
-    // no wait
     const session = sessionManager.lookupSession({
       sessionId: message.sessionId,
     });
-    notifyMessage({
+    addMessage({
       sessionId: message.sessionId,
       sequence: message.sequence,
       messageId: message.messageId,
@@ -167,8 +166,6 @@ async function onMessage(message) {
       params: message.params,
       bridgeId: (session && session.bridgeId) || undefined,
       confId: (session && session.confId) || undefined,
-    }).catch(err => {
-      logger.error(`notifyMessage error: ${err.stack}`);
     });
   }
 
