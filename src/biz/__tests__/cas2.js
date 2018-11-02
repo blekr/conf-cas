@@ -149,4 +149,10 @@ describe('cas biz', () => {
     const dump = await dumpSession();
     expect(dump.sessions.length).toBe(3);
   });
+
+  test('after 6s, a keep alive is sent, and lastKeepAlive is set correctly', async () => {
+    await delay(6000);
+    const dumped = await dumpSession();
+    expect(dumped.lastKeepAlive).toBeTruthy();
+  });
 });

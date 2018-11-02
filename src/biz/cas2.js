@@ -11,7 +11,29 @@ import { addMessage } from './casNotify';
 
 let client;
 let status = 'INIT'; // or CONNECTED, CLOSED
+let interval;
+let lastKeepAlive;
 const sessionManager = new SessionManager();
+
+function sendAndCheckKeepAlive() {
+  const sequence = sessionManager.seq('0');
+  client.sendMessage(
+    new Message()
+      .sId('0')
+      .seq(sequence)
+      .mId('LS.VER'),
+  );
+  if (
+    lastKeepAlive &&
+    new Date().getTime() - lastKeepAlive.getTime() > 35 * 1000
+  ) {
+    logger.error(
+      `do not receive keep alive in 35s, now ${new Date()}, lastKeepAlive: ${lastKeepAlive}`,
+    );
+    status = 'CLOSED';
+    process.exit();
+  }
+}
 
 export function getStatus() {
   return status;
@@ -20,6 +42,7 @@ export function getStatus() {
 export async function dumpSession() {
   return {
     sessions: sessionManager.sessions,
+    lastKeepAlive,
   };
 }
 
@@ -154,7 +177,7 @@ async function onMessage(message) {
   logger.info(`begin processing message: ${message.build()}`);
 
   // send every message to conf-server
-  if (host && port) {
+  if (host && port && message.messageId !== 'LS.VER') {
     const session = sessionManager.lookupSession({
       sessionId: message.sessionId,
     });
@@ -167,6 +190,10 @@ async function onMessage(message) {
       bridgeId: (session && session.bridgeId) || undefined,
       confId: (session && session.confId) || undefined,
     });
+  }
+
+  if (message.messageId === 'LS.VER') {
+    lastKeepAlive = new Date();
   }
 
   // session is created: update sessionId to session manager
@@ -282,10 +309,13 @@ export async function startConnection({ index }) {
       .append('BV'),
   );
   logger.info(`bridge view session created successfully`);
+
+  interval = setInterval(sendAndCheckKeepAlive, 5000);
 }
 
 export async function stopConnection() {
   logger.info(`stop connection: ${!!client}`);
+  clearInterval(interval);
   if (client) {
     client.removeListener('message', onMessage);
     client.close();
