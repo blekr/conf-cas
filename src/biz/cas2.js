@@ -212,6 +212,20 @@ async function onMessage(message) {
       creationSeq: message.sequence,
       sessionId,
     });
+    if (svcKey === 'ACV') {
+      const sequence = sessionManager.seq(sessionId);
+      logger.info(
+        `enable TalkerUpdatesEnabled for ACV session ${sessionId}, seq: ${sequence}`,
+      );
+      client.sendMessage(
+        new Message()
+          .sId(sessionId)
+          .seq(sequence)
+          .mId('ACV.SA.ALTER')
+          .append('TalkerUpdatesEnabled')
+          .append('1'),
+      );
+    }
     return;
   }
   if (message.sessionId === '0' && message.messageId === 'LS.DS') {

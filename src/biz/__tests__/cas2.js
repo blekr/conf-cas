@@ -83,7 +83,26 @@ describe('cas biz', () => {
     expect(sessions.length).toBe(4);
   });
 
-  test('on session created, sessionId is updated', async () => {
+  test('on ACV session created, TalkerUpdatesEnabled is enabled', async () => {
+    emitter.emit(
+      'message',
+      new Message()
+        .sId('0')
+        .seq(3)
+        .mId('LS.CS')
+        .append('ACV')
+        .append('sessionIdACV'),
+    );
+    await delay(10);
+    expect(CASClientSendMessage.mock.calls[0][0].sessionId).toBe(
+      'sessionIdACV',
+    );
+    expect(CASClientSendMessage.mock.calls[0][0].messageId).toBe(
+      'ACV.SA.ALTER',
+    );
+  });
+
+  test('on ACC session created, sessionId is updated', async () => {
     let dump = await dumpSession();
     expect(dump.sessions[3].sessionId).toBe(null);
     emitter.emit(
