@@ -2,7 +2,12 @@
 import validate from 'express-validation';
 import { Router } from 'express';
 import { buildRouteHandler } from '../utils';
-import { dumpSession, sendMessage } from '../biz/cas2';
+import {
+  dumpSession,
+  refreshConferenceAttributes,
+  refreshConferenceList,
+  sendMessage,
+} from '../biz/cas2';
 import validation from './validation/cas';
 import { addRequestSchema } from '../utils/swagger';
 
@@ -16,3 +21,13 @@ casRouter.post(
 );
 
 casRouter.get('/sessions', buildRouteHandler(() => dumpSession()));
+
+casRouter.post(
+  '/refreshConferenceList',
+  buildRouteHandler(() => refreshConferenceList()),
+);
+
+casRouter.post(
+  '/refreshConferenceAttributes',
+  buildRouteHandler(() => refreshConferenceAttributes()),
+);

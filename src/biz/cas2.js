@@ -1,4 +1,4 @@
-/* eslint-disable prefer-rest-params,no-underscore-dangle */
+/* eslint-disable prefer-rest-params,no-underscore-dangle,prefer-destructuring,no-plusplus */
 import { ServerError } from '../errors';
 import config from '../config';
 import logger from '../logger';
@@ -274,6 +274,57 @@ async function onMessage(message) {
   }
 }
 
+export async function refreshConferenceList() {
+  logger.info(`refreshConferenceList biz: no arguments`);
+  const session = sessionManager.lookupSession({ type: 'BV' });
+  if (!session) {
+    throw new ServerError('refreshConferenceList biz: BV session not found');
+  }
+  const { sessionId } = session;
+  const sequence = sessionManager.seq(sessionId);
+  logger.info(
+    `refreshConferenceList biz: send BV.B.ACL: ${sessionId}:${sequence}`,
+  );
+  return _sendMessage(
+    new Message()
+      .sId(sessionId)
+      .seq(sequence)
+      .mId('BV.B.ACL'),
+  );
+}
+
+export async function refreshConferenceAttributes() {
+  logger.info(`refreshConferenceAttributes biz: no arguments`);
+  let count = 0;
+  sessionManager.sessions.forEach(({ type, bridgeId, confId, sessionId }) => {
+    if (type !== 'ACV') {
+      return;
+    }
+    if (!sessionId || !bridgeId || !confId) {
+      logger.info(
+        `refreshConferenceAttributes biz: skip session: ${sessionId}:${bridgeId}:${confId}`,
+      );
+      return;
+    }
+
+    const sequence = sessionManager.seq(sessionId);
+    client.sendMessage(
+      new Message()
+        .sId(sessionId)
+        .seq(sequence)
+        .mId('ACV.A'),
+    );
+    count++;
+  });
+
+  logger.info(
+    `refreshConferenceAttributes biz: refresh ${count}/${
+      sessionManager.sessions.length
+    } sessions`,
+  );
+  return { count, total: sessionManager.sessions.length };
+}
+
 export async function startConnection({ index }) {
   if (client) {
     throw new ServerError('client already exists');
@@ -323,13 +374,18 @@ export async function startConnection({ index }) {
       .append('BV'),
   );
   logger.info(`bridge view session created successfully`);
+}
 
+export function startKeepAlive() {
   interval = setInterval(sendAndCheckKeepAlive, 5000);
+}
+
+export function stopKeepAlive() {
+  clearInterval(interval);
 }
 
 export async function stopConnection() {
   logger.info(`stop connection: ${!!client}`);
-  clearInterval(interval);
   if (client) {
     client.removeListener('message', onMessage);
     client.close();

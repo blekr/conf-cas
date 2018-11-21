@@ -4,7 +4,15 @@ import {
   sendMessage as CASClientSendMessage,
   emitter,
 } from '../../client/CASClient';
-import { dumpSession, sendMessage, startConnection } from '../cas2';
+import {
+  dumpSession,
+  refreshConferenceAttributes,
+  refreshConferenceList,
+  sendMessage,
+  startConnection,
+  startKeepAlive,
+  stopKeepAlive,
+} from '../cas2';
 import logger from '../../logger';
 import { Message } from '../../client/CASMessage';
 import { delay, getJTestExtend } from '../../utils';
@@ -39,7 +47,9 @@ describe('cas biz', () => {
         new Message()
           .sId('0')
           .seq(2)
-          .mId('BV'),
+          .mId('LS.CS')
+          .append('BV')
+          .append('sessionIdBV'),
       );
     }, 2000);
 
@@ -170,8 +180,36 @@ describe('cas biz', () => {
   });
 
   test('after 6s, a keep alive is sent, and lastKeepAlive is set correctly', async () => {
+    startKeepAlive();
     await delay(6000);
     const dumped = await dumpSession();
     expect(dumped.lastKeepAlive).toBeTruthy();
+    stopKeepAlive();
+  });
+
+  test('when refreshConferenceList called, BV.B.ACL is sent', async () => {
+    setTimeout(() => {
+      emitter.emit(
+        'message',
+        new Message()
+          .sId('sessionIdBV')
+          .seq(100)
+          .mId('BV.B.ACL'),
+      );
+    }, 2000);
+    await refreshConferenceList();
+    expect(CASClientSendMessage.mock.calls.length).toBe(1);
+    expect(CASClientSendMessage.mock.calls[0][0].sessionId).toBe('sessionIdBV');
+    expect(CASClientSendMessage.mock.calls[0][0].messageId).toBe('BV.B.ACL');
+  });
+
+  test('when refreshConferenceAttributes called', async () => {
+    const result = await refreshConferenceAttributes();
+    expect(result.count).toBe(1);
+    expect(CASClientSendMessage.mock.calls.length).toBe(1);
+    expect(CASClientSendMessage.mock.calls[0][0].sessionId).toBe(
+      'sessionIdACV',
+    );
+    expect(CASClientSendMessage.mock.calls[0][0].messageId).toBe('ACV.A');
   });
 });
