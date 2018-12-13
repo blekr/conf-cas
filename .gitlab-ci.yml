@@ -18,7 +18,7 @@ stages:
   - build
   - deploy
 
-build:
+build-beta:
   stage: build
   script:
     - docker info
@@ -27,7 +27,18 @@ build:
     - docker push $DOCKER_REGISTRY/repos/conf-cas:beta
   only:
     - develop
-    - master
+
+build-prod:
+  stage: build
+  script:
+    - docker info
+    - docker login -u dockerClient -p MmE5ZjAzMDk0ODI3 $DOCKER_REGISTRY
+    - docker build . -t $DOCKER_REGISTRY/repos/conf-cas:prod
+    - docker push $DOCKER_REGISTRY/repos/conf-cas:prod
+  only:
+    - tags
+  when: manual
+  allow_failure: false
 
 deploy-beta:
   stage: deploy
@@ -49,13 +60,24 @@ deploy-beta:
       ./deploy/conf-cas
   only:
     - develop
-#
-#deploy-prod:
-#  stage: deploy
-#  script:
-#    - ssh prod docker login -u dockerClient -p DczMTUzODcz 101.254.255.75:5000
-#    - ssh prod docker pull 101.254.255.75:5000/ipc-server
-#    - ssh prod docker rm -f ipc-server || true
-#    - ssh prod docker run -d --restart always --add-host "zoneminder-server1:101.254.255.26" --add-host "zoneminder-server2:101.254.255.27" --add-host "zoneminder-server3:101.254.255.28" --name ipc-server --network ipc -e NODE_ENV=production -p 10.255.255.10:8080:8080 101.254.255.75:5000/ipc-server
-#  only:
-#    - master
+
+deploy-prod:
+  stage: deploy
+  image: "dtzar/helm-kubectl:2.9.1"
+  script:
+    - KUBECONFIG=./deploy/config helm version
+    - KUBECONFIG=./deploy/config helm upgrade
+      --install
+      --recreate-pods
+      --namespace prod-conf-cas
+      --set "cas=172.24.4.101:39200"
+      --set "confServer.host=conf-server-service.prod-conf-server.svc.cluster.local"
+      --set "confServer.port=8080"
+      --set "zookeeper.host=zookeeper.zookeeper.svc.cluster.local"
+      --set "zookeeper.port=2181"
+      --set "zookeeper.root=/prod-cas"
+      --set "image.tag=prod"
+      prod-conf-cas
+      ./deploy/conf-cas
+  only:
+    - tags
