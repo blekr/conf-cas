@@ -127,9 +127,12 @@ export async function sendMessage({
 }
 
 function createSession({ type, bridgeId, confId }) {
-  if (sessionManager.lookupSession({ type, bridgeId, confId })) {
+  const session = sessionManager.lookupSession({ type, bridgeId, confId });
+  if (session) {
     logger.info(
-      `${type} session already exists for conference: ${bridgeId}:${confId}`,
+      `${type} session already exists for conference: ${bridgeId}:${confId}, session: ${str(
+        session,
+      )}`,
     );
     return;
   }
@@ -260,8 +263,15 @@ async function onMessage(message) {
   if (message.messageId === 'BV.B.AC.ADD') {
     const bridgeId = message.params[0];
     const confId = message.params[1];
-    createSession({ type: 'ACV', bridgeId, confId });
-    createSession({ type: 'ACC', bridgeId, confId });
+    /*
+     * reason for setTimeout:
+     * @Blekr 昨天那个LS.ERR~SSN问题是这样的：有一个会议在桥上启动，CAS会发BVBV.B.AC.ADD给你，接着CAS就发一条ConferenceQueryState给桥去取这个会议的一些状态。然后你那边用LS.CS~ACV，CAS就把会议的状态发给你。我对比working vs not working 例子，有时CAS在ConferenceQueryState时得到回复在你用LS.CS~ACV之后，就会出现错误。
+     * 报错原因可能有问题，我让开发组看看，我们会在以后版本里改，但是版本出得比较慢。现在要解决问题，就看看你那边能不能查一下你为什么发送的BV消息，这个肯定不对。还有就是可以LS.CS~ACV能不能加点延迟再发（这个方法好像不怎么好）。或者你检查到你发了LS.CS~ACV后，如果没有得到ACV.A～1，ACV.A～2的回复就重新创建ACV
+     */
+    setTimeout(() => {
+      createSession({ type: 'ACV', bridgeId, confId });
+      createSession({ type: 'ACC', bridgeId, confId });
+    }, 2000);
     return;
   }
 
