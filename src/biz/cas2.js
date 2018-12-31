@@ -119,7 +119,11 @@ function createSession({ type, bridgeId, confId }) {
   });
 }
 
-export async function activateConference({ hostPasscode, guessPasscode }) {
+export async function activateConference({
+  hostPasscode,
+  guessPasscode,
+  DNIS,
+}) {
   logger.info(`activateConference biz: ${str(arguments[0])}`);
   assertTruth({
     value: defaultBridgeId,
@@ -164,7 +168,7 @@ export async function activateConference({ hostPasscode, guessPasscode }) {
       .append(guessPasscode)
       .append('1')
       .append('0')
-      .append(''),
+      .append(DNIS),
   );
 
   await delay(1000);

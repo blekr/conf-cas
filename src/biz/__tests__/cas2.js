@@ -258,6 +258,7 @@ describe('cas biz', () => {
     const result = await activateConference({
       hostPasscode: '123',
       guessPasscode: '456',
+      DNIS: '83935596',
     });
     expect(result.sessionId).toBe('sessionId');
     expect(CASClientSendMessage.mock.calls.length).toBe(3);
