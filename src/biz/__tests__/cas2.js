@@ -245,7 +245,7 @@ describe('cas biz', () => {
           .seq(100)
           .mId('ACC.C.ACTIVATE'),
       );
-    }, 2000);
+    }, 3000);
     setTimeout(() => {
       emitter.emit(
         'message',
@@ -254,7 +254,7 @@ describe('cas biz', () => {
           .seq(100)
           .mId('LS.DS'),
       );
-    }, 4000);
+    }, 5000);
     const result = await activateConference({
       hostPasscode: '123',
       guessPasscode: '456',

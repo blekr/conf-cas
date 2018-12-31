@@ -158,6 +158,9 @@ export async function activateConference({
       params[1]
     }`,
   );
+
+  await delay(1000);
+
   await _sendMessage(
     new Message()
       .sId(params[1])
