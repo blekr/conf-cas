@@ -3,6 +3,7 @@ import validate from 'express-validation';
 import { Router } from 'express';
 import { buildRouteHandler } from '../utils';
 import {
+  activateConference,
   dumpSession,
   refreshConferenceAttributes,
   refreshConferenceList,
@@ -21,6 +22,13 @@ casRouter.post(
 );
 
 casRouter.get('/sessions', buildRouteHandler(() => dumpSession()));
+
+addRequestSchema('activateConference', validation.activateConference);
+casRouter.post(
+  '/activateConference',
+  validate(validation.activateConference),
+  buildRouteHandler(({ body }) => activateConference(body)),
+);
 
 casRouter.post(
   '/refreshConferenceList',

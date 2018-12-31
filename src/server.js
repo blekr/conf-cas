@@ -21,7 +21,7 @@ import {
 import { startNotify, stopNotify } from './biz/casNotify';
 
 const port = process.env.PORT || 8080;
-const host = process.env.HOSTNAME || '0.0.0.0';
+const host = '0.0.0.0';
 
 let server;
 

@@ -77,7 +77,22 @@ paths:
                   sessions:
                     type: "array"
                     items: *sessionSchema
-
+  /cas/activateConference:
+    post:
+      summary: "activate a conference"
+      operationId:
+      parameters: "activateConference"
+      responses:
+        200:
+          description: "successful operation"
+          schema:
+            type: "object"
+            properties:
+              <<: *errorFields
+              data:
+                type: "object"
+                properties:
+                  sessionId: {type: "string"}
   /cas/refreshConferenceList:
     post:
       tags:

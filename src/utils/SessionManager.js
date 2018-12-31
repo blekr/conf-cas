@@ -1,7 +1,6 @@
 /* eslint-disable import/prefer-default-export,no-plusplus,guard-for-in,no-restricted-syntax,no-continue */
 
 import filter from 'lodash/filter';
-import { assertTruth } from './index';
 import logger from '../logger';
 
 export class SessionManager {
@@ -64,11 +63,12 @@ export class SessionManager {
 
   updateSessionId({ type, creationSeq, sessionId }) {
     const session = this.lookupSession({ type, creationSeq });
-    assertTruth({
-      value: session,
-      message: `updateSessionId: session not found: ${type}, ${creationSeq}`,
-      serverError: true,
-    });
+    if (!session) {
+      logger.info(
+        `updateSessionId: session not found: ${type}, ${creationSeq}`,
+      );
+      return false;
+    }
     if (session.sessionId) {
       logger.warn(
         `sessionId already exists: ${type}, ${creationSeq}, ${
@@ -77,6 +77,7 @@ export class SessionManager {
       );
     }
     session.sessionId = sessionId;
+    return true;
   }
 
   deleteSession(sessionId) {

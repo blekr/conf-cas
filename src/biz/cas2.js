@@ -4,7 +4,7 @@ import config from '../config';
 import logger from '../logger';
 import { CASClient } from '../client/CASClient';
 import { Message } from '../client/CASMessage';
-import { assertTruth, str } from '../utils';
+import { assertTruth, delay, str } from '../utils';
 import { SessionManager } from '../utils/SessionManager';
 import { ERROR_CODE } from '../constant';
 import { addMessage } from './casNotify';
@@ -14,6 +14,7 @@ let status = 'INIT'; // or CONNECTED, CLOSED
 let interval;
 let lastKeepAlive;
 const sessionManager = new SessionManager();
+let defaultBridgeId;
 
 function sendAndCheckKeepAlive() {
   const sequence = sessionManager.seq('0');
@@ -88,6 +89,106 @@ function _sendMessage(message) {
   });
 }
 
+function createSession({ type, bridgeId, confId }) {
+  const session = sessionManager.lookupSession({ type, bridgeId, confId });
+  if (session) {
+    logger.info(
+      `${type} session already exists for conference: ${bridgeId}:${confId}, session: ${str(
+        session,
+      )}`,
+    );
+    return;
+  }
+  logger.info(`create ${type} session for conference ${bridgeId}:${confId}`);
+
+  const sequence = sessionManager.seq('0');
+  client.sendMessage(
+    new Message()
+      .sId('0')
+      .seq(sequence)
+      .mId('LS.CS')
+      .append(type)
+      .append(bridgeId)
+      .append(confId),
+  );
+  sessionManager.createSession({
+    type,
+    bridgeId,
+    confId,
+    creationSeq: sequence,
+  });
+}
+
+export async function activateConference({ hostPasscode, guessPasscode }) {
+  logger.info(`activateConference biz: ${str(arguments[0])}`);
+  assertTruth({
+    value: defaultBridgeId,
+    message: `defaultBridgeId is null`,
+    serverError: true,
+  });
+
+  const sequence = sessionManager.seq('0');
+
+  logger.info(
+    `activateConference biz: create ACC session of confId 0: ${hostPasscode}:${guessPasscode}, ${defaultBridgeId}`,
+  );
+  const { nak, params } = await _sendMessage(
+    new Message()
+      .sId('0')
+      .seq(sequence)
+      .mId('LS.CS')
+      .append('ACC')
+      .append(defaultBridgeId)
+      .append('0'),
+  );
+  assertTruth({
+    value: !nak,
+    message: `activateConference biz: cas returned nak: ${hostPasscode}:${guessPasscode}, ${str(
+      params,
+    )}`,
+    serverError: true,
+  });
+
+  logger.info(
+    `activateConference biz: send ACC.C.ACTIVATE message: ${hostPasscode}:${guessPasscode}, ${
+      params[1]
+    }`,
+  );
+  await _sendMessage(
+    new Message()
+      .sId(params[1])
+      .seq(1)
+      .mId('ACC.C.ACTIVATE')
+      .append(defaultBridgeId)
+      .append(hostPasscode)
+      .append(guessPasscode)
+      .append('1')
+      .append('0')
+      .append(''),
+  );
+
+  await delay(1000);
+
+  logger.info(
+    `activateConference biz: destroy session: ${hostPasscode}:${guessPasscode}, ${
+      params[1]
+    }`,
+  );
+  await _sendMessage(
+    new Message()
+      .sId('0')
+      .seq(sessionManager.seq('0'))
+      .mId('LS.DS')
+      .append(params[1]),
+  );
+  logger.info(
+    `activateConference biz: finished: ${hostPasscode}:${guessPasscode}`,
+  );
+  return {
+    sessionId: params[1],
+  };
+}
+
 export async function sendMessage({
   bridgeId,
   confId,
@@ -124,36 +225,6 @@ export async function sendMessage({
       .mId(messageId)
       .appendMulti(params),
   );
-}
-
-function createSession({ type, bridgeId, confId }) {
-  const session = sessionManager.lookupSession({ type, bridgeId, confId });
-  if (session) {
-    logger.info(
-      `${type} session already exists for conference: ${bridgeId}:${confId}, session: ${str(
-        session,
-      )}`,
-    );
-    return;
-  }
-  logger.info(`create ${type} session for conference ${bridgeId}:${confId}`);
-
-  const sequence = sessionManager.seq('0');
-  client.sendMessage(
-    new Message()
-      .sId(0)
-      .seq(sequence)
-      .mId('LS.CS')
-      .append(type)
-      .append(bridgeId)
-      .append(confId),
-  );
-  sessionManager.createSession({
-    type,
-    bridgeId,
-    confId,
-    creationSeq: sequence,
-  });
 }
 
 function removeSession({ type, bridgeId, confId }) {
@@ -210,11 +281,20 @@ async function onMessage(message) {
     logger.info(
       `updateSessionId: ${svcKey}, ${message.sequence}, ${sessionId}`,
     );
-    sessionManager.updateSessionId({
-      type: svcKey,
-      creationSeq: message.sequence,
-      sessionId,
-    });
+    if (
+      !sessionManager.updateSessionId({
+        type: svcKey,
+        creationSeq: message.sequence,
+        sessionId,
+      })
+    ) {
+      logger.info(
+        `fail to update sessionId, return now: ${
+          message.sequence
+        }, ${sessionId}`,
+      );
+      return;
+    }
     if (svcKey === 'ACV') {
       const sequence = sessionManager.seq(sessionId);
       logger.info(
@@ -264,7 +344,7 @@ async function onMessage(message) {
     const bridgeId = message.params[0];
     const confId = message.params[1];
     /*
-     * reason for setTimeout:
+     * why setTimeout:
      * @Blekr 昨天那个LS.ERR~SSN问题是这样的：有一个会议在桥上启动，CAS会发BVBV.B.AC.ADD给你，接着CAS就发一条ConferenceQueryState给桥去取这个会议的一些状态。然后你那边用LS.CS~ACV，CAS就把会议的状态发给你。我对比working vs not working 例子，有时CAS在ConferenceQueryState时得到回复在你用LS.CS~ACV之后，就会出现错误。
      * 报错原因可能有问题，我让开发组看看，我们会在以后版本里改，但是版本出得比较慢。现在要解决问题，就看看你那边能不能查一下你为什么发送的BV消息，这个肯定不对。还有就是可以LS.CS~ACV能不能加点延迟再发（这个方法好像不怎么好）。或者你检查到你发了LS.CS~ACV后，如果没有得到ACV.A～1，ACV.A～2的回复就重新创建ACV
      */
@@ -281,6 +361,13 @@ async function onMessage(message) {
     const confId = message.params[1];
     removeSession({ type: 'ACV', bridgeId, confId });
     removeSession({ type: 'ACC', bridgeId, confId });
+    return;
+  }
+
+  if (message.messageId === 'BV.BL') {
+    defaultBridgeId = message.params[3];
+    // eslint-disable-next-line no-useless-return
+    return;
   }
 }
 

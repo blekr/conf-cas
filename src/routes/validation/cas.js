@@ -13,4 +13,10 @@ export default {
       params: joi.array().items(joi.string().allow('')),
     },
   },
+  activateConference: {
+    body: {
+      hostPasscode: joi.string().required(),
+      guessPasscode: joi.string().required(),
+    },
+  },
 };

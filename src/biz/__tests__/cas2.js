@@ -5,6 +5,7 @@ import {
   emitter,
 } from '../../client/CASClient';
 import {
+  activateConference,
   dumpSession,
   refreshConferenceAttributes,
   refreshConferenceList,
@@ -211,5 +212,66 @@ describe('cas biz', () => {
       'sessionIdACV',
     );
     expect(CASClientSendMessage.mock.calls[0][0].messageId).toBe('ACV.A');
+  });
+
+  test('activateConference', async () => {
+    emitter.emit(
+      'message',
+      new Message()
+        .sId('0')
+        .seq(1)
+        .mId('BV.BL')
+        .append('1')
+        .append('1')
+        .append('1')
+        .append('bridgeId'),
+    );
+    setTimeout(() => {
+      emitter.emit(
+        'message',
+        new Message()
+          .sId('0')
+          .seq(100)
+          .mId('LS.CS')
+          .append('ACC')
+          .append('sessionId'),
+      );
+    }, 1000);
+    setTimeout(() => {
+      emitter.emit(
+        'message',
+        new Message()
+          .sId('sessionId')
+          .seq(100)
+          .mId('ACC.C.ACTIVATE'),
+      );
+    }, 2000);
+    setTimeout(() => {
+      emitter.emit(
+        'message',
+        new Message()
+          .sId('0')
+          .seq(100)
+          .mId('LS.DS'),
+      );
+    }, 4000);
+    const result = await activateConference({
+      hostPasscode: '123',
+      guessPasscode: '456',
+    });
+    expect(result.sessionId).toBe('sessionId');
+    expect(CASClientSendMessage.mock.calls.length).toBe(3);
+    expect(CASClientSendMessage.mock.calls[0][0].sessionId).toBe('0');
+    expect(CASClientSendMessage.mock.calls[0][0].messageId).toBe('LS.CS');
+    expect(CASClientSendMessage.mock.calls[0][0].params[1]).toBe('bridgeId');
+    expect(CASClientSendMessage.mock.calls[1][0].sessionId).toBe('sessionId');
+    expect(CASClientSendMessage.mock.calls[1][0].messageId).toBe(
+      'ACC.C.ACTIVATE',
+    );
+    expect(CASClientSendMessage.mock.calls[1][0].params[1]).toBe('123');
+    expect(CASClientSendMessage.mock.calls[1][0].params[2]).toBe('456');
+    expect(CASClientSendMessage.mock.calls[2][0].sessionId).toBe('0');
+    expect(CASClientSendMessage.mock.calls[2][0].messageId).toBe('LS.DS');
+    expect(CASClientSendMessage.mock.calls[2][0].params[0]).toBe('sessionId');
   });
 });
