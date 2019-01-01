@@ -17,7 +17,7 @@ export default {
     body: {
       hostPasscode: joi.string().required(),
       guessPasscode: joi.string().required(),
-      DNIS: joi.string().required(),
+      DNIS: joi.string(),
     },
   },
 };

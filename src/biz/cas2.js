@@ -170,8 +170,8 @@ export async function activateConference({
       .append(hostPasscode)
       .append(guessPasscode)
       .append('1')
-      .append('1')
-      .append(DNIS),
+      .append('0')
+      .append(DNIS || ''),
   );
 
   await delay(1000);
