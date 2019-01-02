@@ -79,6 +79,8 @@ paths:
                     items: *sessionSchema
   /cas/activateConference:
     post:
+      tags:
+        - "cas"
       summary: "activate a conference"
       operationId:
       parameters: "activateConference"
