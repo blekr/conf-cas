@@ -142,8 +142,7 @@ export async function activateConference({
       .seq(sequence)
       .mId('LS.CS')
       .append('ACC')
-      .append(defaultBridgeId)
-      .append('0'),
+      .append(defaultBridgeId),
   );
   assertTruth({
     value: !nak,
