@@ -24,6 +24,12 @@ import { resolveSwaggerDefinition } from './utils/swagger';
 import { casRouter } from './routes/cas';
 import { ERROR_CODE } from './constant';
 import logger from './logger';
+import {
+  injectMetricsRoute,
+  requestCounters,
+  responseCounters,
+  startCollection,
+} from './utils/prometheus';
 
 const swaggerDocument = yaml.safeLoad(
   fs.readFileSync('./spec/swagger.yml', 'utf8'),
@@ -31,6 +37,11 @@ const swaggerDocument = yaml.safeLoad(
 swaggerDocument.info.version = require('../package').version;
 
 const app = express();
+
+injectMetricsRoute(app);
+startCollection();
+app.use(requestCounters);
+app.use(responseCounters);
 
 app.use(compression());
 app.use(cookieParser());

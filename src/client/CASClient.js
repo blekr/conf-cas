@@ -3,6 +3,7 @@ import EventEmitter from 'events';
 import net from 'net';
 import logger from '../logger';
 import { Message } from './CASMessage';
+import { increaseCasIn, increaseCasOut } from '../utils/prometheus';
 
 export class CASClient extends EventEmitter {
   constructor({ host, port }) {
@@ -55,7 +56,9 @@ export class CASClient extends EventEmitter {
       const message = Message.fromMsg(msg);
       this.received = this.received.slice(end + 1);
       this.emit('message', message);
+
       logger.info(`<-- ${msg}`);
+      increaseCasIn();
     }
   }
 
@@ -88,7 +91,9 @@ export class CASClient extends EventEmitter {
 
     const pkg = `\x02${msg}${xorSum}${byteSum}\x03`;
     this.client.write(pkg);
+
     logger.info(`--> ${msg}`);
+    increaseCasOut();
   }
 
   close() {

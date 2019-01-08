@@ -1,5 +1,6 @@
 import winston from 'winston';
 import isEmpty from 'lodash/isEmpty';
+import { increaseErrors } from './utils/prometheus';
 
 const transports = [
   new winston.transports.Console({
@@ -18,4 +19,11 @@ const logger = new winston.Logger({
   transports,
 });
 
-export default logger;
+export default {
+  info: logger.info,
+  warn: logger.warn,
+  error: (...args) => {
+    increaseErrors();
+    logger.error(...args);
+  },
+};
