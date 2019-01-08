@@ -33,7 +33,9 @@ export function requestCounters(req, res, next) {
   if (req.path !== '/metrics') {
     numOfRequests.inc({
       method: req.method,
-      path: req.originalUrl.replace(/\?.*/, ''),
+      path: req.originalUrl
+        .replace(/\?.*/, '')
+        .replace(/\/[a-fA-F0-9]{24}/, 'objectId'),
     });
   }
   next();
@@ -42,7 +44,12 @@ export function requestCounters(req, res, next) {
 export const responseCounters = ResponseTime((req, res, time) => {
   if (req.url !== '/metrics') {
     responses
-      .labels(req.method, req.originalUrl.replace(/\?.*/, ''))
+      .labels(
+        req.method,
+        req.originalUrl
+          .replace(/\?.*/, '')
+          .replace(/\/[a-fA-F0-9]{24}/, 'objectId'),
+      )
       .observe(time);
   }
 });
