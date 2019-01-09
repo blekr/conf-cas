@@ -35,7 +35,7 @@ export function requestCounters(req, res, next) {
       method: req.method,
       path: req.originalUrl
         .replace(/\?.*/, '')
-        .replace(/\/[a-fA-F0-9]{24}/, 'objectId'),
+        .replace(/[a-fA-F0-9]{24}/, 'objectId'),
     });
   }
   next();
@@ -48,7 +48,7 @@ export const responseCounters = ResponseTime((req, res, time) => {
         req.method,
         req.originalUrl
           .replace(/\?.*/, '')
-          .replace(/\/[a-fA-F0-9]{24}/, 'objectId'),
+          .replace(/[a-fA-F0-9]{24}/, 'objectId'),
       )
       .observe(time);
   }
