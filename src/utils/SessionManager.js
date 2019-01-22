@@ -19,9 +19,14 @@ export class SessionManager {
     ];
   }
 
+  // seq: [1, 999]
   seq(sessionId) {
     const session = this.lookupSession({ sessionId });
-    return session.seq++;
+    const ret = session.seq++;
+    if (session.seq >= 1000) {
+      session.seq = 1;
+    }
+    return ret;
   }
 
   lookupSession({ sessionId, type, bridgeId, confId, creationSeq }) {
