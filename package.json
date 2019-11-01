@@ -30,7 +30,7 @@
     "juice": "^4.2.2",
     "knex": "^0.14.2",
     "lodash": "^4.17.10",
-    "mongoose": "^5.2.4",
+    "mongoose": "^5.7.5",
     "morgan": "^1.9.1",
     "node-fetch": "^1.7.3",
     "node-zookeeper-client": "^0.2.2",
